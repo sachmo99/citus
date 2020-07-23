@@ -26,9 +26,6 @@
 #include "utils/memutils.h"
 
 
-static int CalculateUniformHashRangeIndex(int hashedValue, int shardCount);
-
-
 /*
  * LowestShardIntervalById returns the shard interval with the lowest shard
  * ID from a list of shard intervals.
@@ -443,13 +440,13 @@ SearchCachedShardInterval(Datum partitionColumnValue, ShardInterval **shardInter
  * NOTE: This function is ONLY for hash-distributed tables with uniform
  * hash ranges.
  */
-static int
+int
 CalculateUniformHashRangeIndex(int hashedValue, int shardCount)
 {
 	int64 hashedValue64 = (int64) hashedValue;
 
 	/* normalize to the 0-UINT32_MAX range */
-	int64 normalizedHashValue = hashedValue64 - INT32_MIN;
+	int64 normalizedHashValue = hashedValue64 - PG_INT32_MIN;
 
 	/* size of each hash range */
 	int64 hashRangeSize = HASH_TOKEN_COUNT / shardCount;
