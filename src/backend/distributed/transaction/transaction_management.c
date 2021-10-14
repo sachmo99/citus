@@ -102,6 +102,11 @@ MemoryContext CommitContext = NULL;
  */
 bool ShouldCoordinatedTransactionUse2PC = false;
 
+/*
+ * Distribution function argument when delgated using forcePushdown flag.
+ */
+Const *AllowedDistributionColumnValue = NULL;
+
 /* if disabled, distributed statements in a function may run as separate transactions */
 bool FunctionOpensTransactionBlock = true;
 
@@ -182,6 +187,32 @@ InCoordinatedTransaction(void)
 {
 	return CurrentCoordinatedTransactionState != COORD_TRANS_NONE &&
 		   CurrentCoordinatedTransactionState != COORD_TRANS_IDLE;
+}
+
+
+/*
+ * Sets the distribution argument value indicating that current node is executing
+ * a delegated function call, using forcePushdown, within a distributed transaction
+ * issued by the coordinator.
+ */
+void
+EnableInForceDelegatedFuncExecution(Const *distArgument)
+{
+	AllowedDistributionColumnValue = distArgument;
+}
+
+
+/*
+ * Returns the forcePushdown function distribution argument (if any).
+ */
+Const *
+GetInForceDelegatedFuncExecution()
+{
+	/*
+	 * This value is overloaded, a NULL indicates as false i.e. we are
+	 * not in a forcePushdown delegated function execution.
+	 */
+	return AllowedDistributionColumnValue;
 }
 
 
@@ -459,7 +490,7 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 		case XACT_EVENT_PARALLEL_PRE_COMMIT:
 		case XACT_EVENT_PRE_PREPARE:
 		{
-			if (InCoordinatedTransaction())
+			if (InCoordinatedTransaction() && !GetInForceDelegatedFuncExecution())
 			{
 				ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								errmsg("cannot use 2PC in transactions involving "
@@ -551,6 +582,7 @@ ResetGlobalVariables()
 	TransactionModifiedNodeMetadata = false;
 	MetadataSyncOnCommit = false;
 	ResetWorkerErrorIndication();
+	AllowedDistributionColumnValue = NULL;
 }
 
 
@@ -774,6 +806,40 @@ IsMultiStatementTransaction(void)
 		return false;
 	}
 }
+
+
+#if DELETE
+
+/*
+ * IsForcePushdown determines whether the current function can pushed down
+ * to the worker node. The only condition we will consider the forcePushdown
+ * flag is, when the function is called in an explicit BEGIN-END transaction
+ * block without being nested in other function calls, implicit transactions
+ * or a combination of both.
+ */
+bool
+IsForcePushdown(void)
+{
+	if (StoredProcedureLevel > 0 || DoBlockLevel > 0)
+	{
+		return false;
+	}
+	else if (MaybeExecutingUDF() && FunctionOpensTransactionBlock)
+	{
+		return false;
+	}
+	else if (IsTransactionBlock())
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+
+#endif
 
 
 /*

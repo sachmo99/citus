@@ -3,6 +3,7 @@
 DROP FUNCTION pg_catalog.fix_all_partition_shard_index_names();
 DROP FUNCTION pg_catalog.fix_partition_shard_index_names(regclass);
 DROP FUNCTION pg_catalog.worker_fix_partition_shard_index_names(regclass, text, text);
+DROP FUNCTION pg_catalog.create_distributed_function(regprocedure, text, text, bool);
 
 CREATE FUNCTION pg_catalog.master_apply_delete_command(text)
     RETURNS integer
@@ -35,3 +36,6 @@ COMMENT ON FUNCTION master_append_table_to_shard(bigint, text, text, integer)
 
 GRANT ALL ON FUNCTION start_metadata_sync_to_node(text, integer) TO PUBLIC;
 GRANT ALL ON FUNCTION stop_metadata_sync_to_node(text, integer,bool) TO PUBLIC;
+
+#include "../udfs/create_distributed_function/9.0-1.sql"
+ALTER TABLE citus.pg_dist_object DROP COLUMN force_pushdown;

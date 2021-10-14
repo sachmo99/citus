@@ -78,7 +78,8 @@ static void EnsureFunctionCanBeColocatedWithTable(Oid functionOid, Oid
 												  sourceRelationId);
 static void UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 										   int *distribution_argument_index,
-										   int *colocationId);
+										   int *colocationId,
+										   bool forcePushdown);
 static void EnsureSequentialModeForFunctionDDL(void);
 static void TriggerSyncMetadataToPrimaryNodes(void);
 static bool ShouldPropagateCreateFunction(CreateFunctionStmt *stmt);
@@ -93,6 +94,7 @@ static void DistributeFunctionWithDistributionArgument(RegProcedure funcOid,
 													   char *distributionArgumentName,
 													   Oid distributionArgumentOid,
 													   char *colocateWithTableName,
+													   bool forcePushdown,
 													   const ObjectAddress *
 													   functionAddress);
 static void DistributeFunctionColocatedWithDistributedTable(RegProcedure funcOid,
@@ -126,6 +128,7 @@ create_distributed_function(PG_FUNCTION_ARGS)
 
 	char *distributionArgumentName = NULL;
 	char *colocateWithTableName = NULL;
+	bool forcePushdown = PG_GETARG_BOOL(3);
 
 	/* if called on NULL input, error out */
 	if (funcOid == InvalidOid)
@@ -198,6 +201,7 @@ create_distributed_function(PG_FUNCTION_ARGS)
 		DistributeFunctionWithDistributionArgument(funcOid, distributionArgumentName,
 												   distributionArgumentOid,
 												   colocateWithTableName,
+												   forcePushdown,
 												   &functionAddress);
 	}
 	else if (!colocatedWithReferenceTable)
@@ -224,6 +228,7 @@ DistributeFunctionWithDistributionArgument(RegProcedure funcOid,
 										   char *distributionArgumentName,
 										   Oid distributionArgumentOid,
 										   char *colocateWithTableName,
+										   bool forcePushdown,
 										   const ObjectAddress *functionAddress)
 {
 	/* get the argument index, or error out if we cannot find a valid index */
@@ -238,7 +243,8 @@ DistributeFunctionWithDistributionArgument(RegProcedure funcOid,
 
 	/* record the distribution argument and colocationId */
 	UpdateFunctionDistributionInfo(functionAddress, &distributionArgumentIndex,
-								   &colocationId);
+								   &colocationId,
+								   forcePushdown);
 
 	/*
 	 * Once we have at least one distributed function/procedure with distribution
@@ -276,7 +282,7 @@ DistributeFunctionColocatedWithDistributedTable(RegProcedure funcOid,
 	}
 
 	/* set distribution argument and colocationId to NULL */
-	UpdateFunctionDistributionInfo(functionAddress, NULL, NULL);
+	UpdateFunctionDistributionInfo(functionAddress, NULL, NULL, false);
 }
 
 
@@ -293,7 +299,8 @@ DistributeFunctionColocatedWithReferenceTable(const ObjectAddress *functionAddre
 	/* set distribution argument to NULL and colocationId to the reference table colocation id */
 	int *distributionArgumentIndex = NULL;
 	UpdateFunctionDistributionInfo(functionAddress, distributionArgumentIndex,
-								   &colocationId);
+								   &colocationId,
+								   false);
 
 	/*
 	 * Once we have at least one distributed function/procedure that reads
@@ -568,7 +575,8 @@ EnsureFunctionCanBeColocatedWithTable(Oid functionOid, Oid distributionColumnTyp
 static void
 UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 							   int *distribution_argument_index,
-							   int *colocationId)
+							   int *colocationId,
+							   bool forcePushdown)
 {
 	const bool indexOK = true;
 
@@ -626,6 +634,10 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 	{
 		isnull[Anum_pg_dist_object_colocationid - 1] = true;
 	}
+
+	replace[Anum_pg_dist_object_force_pushdown - 1] = true;
+	isnull[Anum_pg_dist_object_force_pushdown - 1] = false;
+	values[Anum_pg_dist_object_force_pushdown - 1] = BoolGetDatum(forcePushdown);
 
 	heapTuple = heap_modify_tuple(heapTuple, tupleDescriptor, values, isnull, replace);
 
