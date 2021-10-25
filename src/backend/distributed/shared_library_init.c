@@ -592,7 +592,7 @@ RegisterCitusConfigVariables(void)
 		false,
 #endif
 		PGC_SIGHUP,
-		GUC_STANDARD,
+		GUC_NO_SHOW_ALL,
 		NULL, NULL, NULL);
 
 	DefineCustomBoolVariable(
