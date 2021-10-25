@@ -1,8 +1,8 @@
 -- citus--10.2-4--11.0-1
 
--- bump version to 11.0-1
+#include "udfs/worker_partition_query_result/11.0-1.sql"
 
-DROP FUNCTION IF EXISTS pg_catalog.master_apply_delete_command(text);
+DROP FUNCTION pg_catalog.master_apply_delete_command(text);
 DROP FUNCTION pg_catalog.master_get_table_metadata(text);
 DROP FUNCTION pg_catalog.master_append_table_to_shard(bigint, text, text, integer);
 
