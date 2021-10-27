@@ -3,7 +3,7 @@
 DROP FUNCTION pg_catalog.fix_all_partition_shard_index_names();
 DROP FUNCTION pg_catalog.fix_partition_shard_index_names(regclass);
 DROP FUNCTION pg_catalog.worker_fix_partition_shard_index_names(regclass, text, text);
-DROP FUNCTION pg_catalog.citus_internal_add_object_metadata(oid, oid, oid, integer, integer);
+DROP FUNCTION pg_catalog.citus_internal_add_object_metadata(text, text[], text[], integer, integer);
 
 CREATE FUNCTION pg_catalog.master_apply_delete_command(text)
     RETURNS integer

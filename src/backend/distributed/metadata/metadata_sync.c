@@ -47,6 +47,7 @@
 #include "distributed/metadata_cache.h"
 #include "distributed/metadata_sync.h"
 #include "distributed/metadata/distobject.h"
+#include "distributed/metadata/pg_dist_object.h"
 #include "distributed/multi_executor.h"
 #include "distributed/multi_join_order.h"
 #include "distributed/multi_partitioning_utils.h"
@@ -67,6 +68,7 @@
 #include "pgstat.h"
 #include "postmaster/bgworker.h"
 #include "postmaster/postmaster.h"
+#include "parser/parse_type.h"
 #include "storage/lmgr.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
@@ -114,6 +116,11 @@ static void EnsureShardMetadataIsSane(Oid relationId, int64 shardId, char storag
 static void EnsureShardPlacementMetadataIsSane(Oid relationId, int64 shardId,
 											   int64 placementId, int32 shardState,
 											   int64 shardLength, int32 groupId);
+static void GetObjectTypeAndNode(char *ttype, ArrayType *namearr,
+								 ArrayType *argsarr, ObjectType *type,
+								 Node *objnode);
+static List * DistributedObjectSyncCommandList(void);		
+static List *textarray_to_strvaluelist(ArrayType *arr);												
 
 PG_FUNCTION_INFO_V1(start_metadata_sync_to_node);
 PG_FUNCTION_INFO_V1(stop_metadata_sync_to_node);
@@ -791,7 +798,7 @@ MetadataDropCommands(void)
 									  REMOVE_ALL_CLUSTERED_TABLES_COMMAND);
 
 	dropSnapshotCommandList = lappend(dropSnapshotCommandList, DELETE_ALL_NODES);
-	dropSnapshotCommandList = lappend(dropSnapshotCommandList, DELETE_ALL_OBJECTS);
+	dropSnapshotCommandList = lappend(dropSnapshotCommandList, "TRUNCATE pg_dist_object");
 
 	return dropSnapshotCommandList;
 }
@@ -877,41 +884,16 @@ DistributedObjectCreateCommand(const ObjectAddress *address,
 							   int32 *colocationId)
 {
 	StringInfo insertDistributedObjectCommand = makeStringInfo();
-
-	/*
-	 * Here we get the three things that pg_identify_object_as_address returns,
-	 * without going through the hassle of going from and to Datums using
-	 * DirectFunctionCall3.
-	 */
 	List *names;
 	List *args;
 	char *objectType = getObjectTypeDescription(address);
 	getObjectIdentityParts(address, &names, &args);
 
 	appendStringInfo(insertDistributedObjectCommand,
-					 "SELECT citus_internal_add_object_metadata "
-					 "(classid, objid, objsubid, ");
-	if (distributionArgumentIndex == NULL)
-	{
-		appendStringInfo(insertDistributedObjectCommand, "NULL, ");
-	}
-	else
-	{
-		appendStringInfo(insertDistributedObjectCommand, "%d, ",
-						 *distributionArgumentIndex);
-	}
-	if (colocationId == NULL)
-	{
-		appendStringInfo(insertDistributedObjectCommand, "NULL");
-	}
-	else
-	{
-		appendStringInfo(insertDistributedObjectCommand, "%d", 
-						 *colocationId);
-	}
+					 "SELECT citus_internal_add_object_metadata(");
 
 	appendStringInfo(insertDistributedObjectCommand,
-					 ") FROM pg_get_object_address(%s, ARRAY[",
+					 "%s, ARRAY[",
 					 quote_literal_cstr(objectType));
 
 	char *name;
@@ -940,7 +922,27 @@ DistributedObjectCreateCommand(const ObjectAddress *address,
 		appendStringInfoString(insertDistributedObjectCommand, quote_literal_cstr(arg));
 	}
 
-	appendStringInfo(insertDistributedObjectCommand, "]::text[])");
+	appendStringInfo(insertDistributedObjectCommand, "]::text[],");
+
+	if (distributionArgumentIndex == NULL)
+	{
+		appendStringInfo(insertDistributedObjectCommand, "NULL, ");
+	}
+	else
+	{
+		appendStringInfo(insertDistributedObjectCommand, "%d, ",
+						 *distributionArgumentIndex);
+	}
+	if (colocationId == NULL)
+	{
+		appendStringInfo(insertDistributedObjectCommand, "NULL)");
+	}
+	else
+	{
+		appendStringInfo(insertDistributedObjectCommand, "%d)", 
+						 *colocationId);
+	}
+
 	return insertDistributedObjectCommand->data;
 }
 
@@ -952,27 +954,20 @@ DistributedObjectCreateCommand(const ObjectAddress *address,
 Datum
 citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 {
-	PG_ENSURE_ARGNOTNULL(0, "classid");
-	PG_ENSURE_ARGNOTNULL(1, "objid");
-	PG_ENSURE_ARGNOTNULL(2, "objsubid");
-	Oid classid = PG_GETARG_OID(0);
-	Oid objid = PG_GETARG_OID(1);
-	Oid objsubid = PG_GETARG_OID(2);
+	char *textType = TextDatumGetCString(PG_GETARG_DATUM(0));
+	ArrayType *nameArray = PG_GETARG_ARRAYTYPE_P(1);
+	ArrayType *argsArray = PG_GETARG_ARRAYTYPE_P(2);
 	int distributionArgumentIndexValue;
 	int colocationIdValue;
 	
-	if (!PG_ARGISNULL(3))
+	if (!PG_ARGISNULL(4))
 	{
 		distributionArgumentIndexValue = PG_GETARG_INT32(3);
 	}
-	if (!PG_ARGISNULL(4))
+	if (!PG_ARGISNULL(5))
 	{
 		colocationIdValue = PG_GETARG_INT32(4);
 	}
-
-	/* TODO: only owner of the object is allowed to modify the metadata */
-
-	/* TODO: maybe we want to serialize all the metadata changes to this table */
 
 	if (!ShouldSkipMetadataChecks())
 	{
@@ -980,15 +975,320 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 		EnsureCoordinatorInitiatedOperation();
 	}
 
-	ObjectAddress address = { 0 };
-	ObjectAddressSubSet(address, classid, objid, objsubid);
+	/* Check the current user is the owner of the object */
+	ObjectType objectType;
+	Node objectNode;
 
-	MarkObjectDistributed(&address, true);
-	UpdateFunctionDistributionInfo(&address, &distributionArgumentIndexValue, &colocationIdValue, true);
+	GetObjectTypeAndNode(textType, nameArray, argsArray, &objectType, &objectNode);
+	Relation relation;
+
+	ObjectAddress objectAddress = get_object_address(objectType, &objectNode, &relation, AccessShareLock, false);	
+	check_object_ownership(GetUserId(), objectType, objectAddress, &objectNode, relation);
+
+	if (relation)
+		relation_close(relation, AccessShareLock);
+
+	/* Update the metadata for the given object on the node */
+	MarkObjectDistributed(&objectAddress, true);
+	UpdateFunctionDistributionInfo(&objectAddress, &distributionArgumentIndexValue, &colocationIdValue, true);
 
 	PG_RETURN_VOID();
 }
 
+
+/*
+ * Get the object type and node from the given type text, names and arguments.
+ * 
+ * This function is mostly copied from pg_get_object_address of the PG code. We need
+ * to copy that function to get both object type and node. 
+ */
+static void
+GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr, ObjectType *type, Node *objnode)
+{
+	int	itype;
+	List *name = NIL;
+	TypeName *typename = NULL;
+	List *args = NIL;
+	Relation relation;
+
+	/* Decode object type, raise error if unknown */
+	itype = read_objtype_from_string(ttype);
+	if (itype < 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("unsupported object type \"%s\"", ttype)));
+	*type = (ObjectType) itype;
+
+	/*
+	 * Convert the text array to the representation appropriate for the given
+	 * object type.  Most use a simple string Values list, but there are some
+	 * exceptions.
+	 */
+	if (*type == OBJECT_TYPE || *type == OBJECT_DOMAIN || *type == OBJECT_CAST ||
+		*type == OBJECT_TRANSFORM || *type == OBJECT_DOMCONSTRAINT)
+	{
+		Datum	   *elems;
+		bool	   *nulls;
+		int			nelems;
+
+		deconstruct_array(namearr, TEXTOID, -1, false, TYPALIGN_INT,
+						  &elems, &nulls, &nelems);
+		if (nelems != 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("name list length must be exactly %d", 1)));
+		if (nulls[0])
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("name or argument lists may not contain nulls")));
+		typename = typeStringToTypeName(TextDatumGetCString(elems[0]));
+	}
+	else if (*type == OBJECT_LARGEOBJECT)
+	{
+		Datum	   *elems;
+		bool	   *nulls;
+		int			nelems;
+
+		deconstruct_array(namearr, TEXTOID, -1, false, TYPALIGN_INT,
+						  &elems, &nulls, &nelems);
+		if (nelems != 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("name list length must be exactly %d", 1)));
+		if (nulls[0])
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("large object OID may not be null")));
+		objnode = (Node *) makeFloat(TextDatumGetCString(elems[0]));
+	}
+	else
+	{
+		name = textarray_to_strvaluelist(namearr);
+		if (list_length(name) < 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("name list length must be at least %d", 1)));
+	}
+
+	/*
+	 * If args are given, decode them according to the object type.
+	 */
+	if (*type == OBJECT_AGGREGATE ||
+		*type == OBJECT_FUNCTION ||
+		*type == OBJECT_PROCEDURE ||
+		*type == OBJECT_ROUTINE ||
+		*type == OBJECT_OPERATOR ||
+		*type == OBJECT_CAST ||
+		*type == OBJECT_AMOP ||
+		*type == OBJECT_AMPROC)
+	{
+		/* in these cases, the args list must be of TypeName */
+		Datum	   *elems;
+		bool	   *nulls;
+		int			nelems;
+		int			i;
+
+		deconstruct_array(argsarr, TEXTOID, -1, false, TYPALIGN_INT,
+						  &elems, &nulls, &nelems);
+
+		args = NIL;
+		for (i = 0; i < nelems; i++)
+		{
+			if (nulls[i])
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("name or argument lists may not contain nulls")));
+			args = lappend(args,
+						   typeStringToTypeName(TextDatumGetCString(elems[i])));
+		}
+	}
+	else
+	{
+		/* For all other object types, use string Values */
+		args = textarray_to_strvaluelist(argsarr);
+	}
+
+	/*
+	 * get_object_address is pretty sensitive to the length of its input
+	 * lists; check that they're what it wants.
+	 */
+	switch (*type)
+	{
+		case OBJECT_DOMCONSTRAINT:
+		case OBJECT_CAST:
+		case OBJECT_USER_MAPPING:
+		case OBJECT_PUBLICATION_REL:
+		case OBJECT_DEFACL:
+		case OBJECT_TRANSFORM:
+			if (list_length(args) != 1)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("argument list length must be exactly %d", 1)));
+			}
+
+			break;
+		case OBJECT_OPFAMILY:
+		case OBJECT_OPCLASS:
+			if (list_length(name) < 2)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("name list length must be at least %d", 2)));
+			}
+
+			break;
+		case OBJECT_AMOP:
+		case OBJECT_AMPROC:
+			if (list_length(name) < 3)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("name list length must be at least %d", 3)));
+			}
+
+			/* fall through to check args length */
+			/* FALLTHROUGH */
+		case OBJECT_OPERATOR:
+			if (list_length(args) != 2)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("argument list length must be exactly %d", 2)));
+			}
+
+			break;
+		default:
+			break;
+	}
+
+	/*
+	 * Now build the Node type that get_object_address() expects for the given
+	 * type.
+	 */
+	switch (*type)
+	{
+		case OBJECT_TABLE:
+		case OBJECT_SEQUENCE:
+		case OBJECT_VIEW:
+		case OBJECT_MATVIEW:
+		case OBJECT_INDEX:
+		case OBJECT_FOREIGN_TABLE:
+		case OBJECT_COLUMN:
+		case OBJECT_ATTRIBUTE:
+		case OBJECT_COLLATION:
+		case OBJECT_CONVERSION:
+		case OBJECT_STATISTIC_EXT:
+		case OBJECT_TSPARSER:
+		case OBJECT_TSDICTIONARY:
+		case OBJECT_TSTEMPLATE:
+		case OBJECT_TSCONFIGURATION:
+		case OBJECT_DEFAULT:
+		case OBJECT_POLICY:
+		case OBJECT_RULE:
+		case OBJECT_TRIGGER:
+		case OBJECT_TABCONSTRAINT:
+		case OBJECT_OPCLASS:
+		case OBJECT_OPFAMILY:
+			objnode = (Node *) name;
+			break;
+		case OBJECT_ACCESS_METHOD:
+		case OBJECT_DATABASE:
+		case OBJECT_EVENT_TRIGGER:
+		case OBJECT_EXTENSION:
+		case OBJECT_FDW:
+		case OBJECT_FOREIGN_SERVER:
+		case OBJECT_LANGUAGE:
+		case OBJECT_PUBLICATION:
+		case OBJECT_ROLE:
+		case OBJECT_SCHEMA:
+		case OBJECT_SUBSCRIPTION:
+		case OBJECT_TABLESPACE:
+			if (list_length(name) != 1)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("name list length must be exactly %d", 1)));
+			}
+			objnode = linitial(name);
+			break;
+		case OBJECT_TYPE:
+		case OBJECT_DOMAIN:
+			objnode = (Node *) typename;
+			break;
+		case OBJECT_CAST:
+		case OBJECT_DOMCONSTRAINT:
+		case OBJECT_TRANSFORM:
+			objnode = (Node *) list_make2(typename, linitial(args));
+			break;
+		case OBJECT_PUBLICATION_REL:
+			objnode = (Node *) list_make2(name, linitial(args));
+			break;
+		case OBJECT_USER_MAPPING:
+			objnode = (Node *) list_make2(linitial(name), linitial(args));
+			break;
+		case OBJECT_DEFACL:
+			objnode = (Node *) lcons(linitial(args), name);
+			break;
+		case OBJECT_AMOP:
+		case OBJECT_AMPROC:
+			objnode = (Node *) list_make2(name, args);
+			break;
+		case OBJECT_FUNCTION:
+		case OBJECT_PROCEDURE:
+		case OBJECT_ROUTINE:
+		case OBJECT_AGGREGATE:
+		case OBJECT_OPERATOR:
+			{
+				ObjectWithArgs *owa = makeNode(ObjectWithArgs);
+
+				owa->objname = name;
+				owa->objargs = args;
+				objnode = (Node *) owa;
+				break;
+			}
+		case OBJECT_LARGEOBJECT:
+			/* already handled above */
+			break;
+			/* no default, to let compiler warn about missing case */
+	}
+
+	if (objnode == NULL)
+	{
+		elog(ERROR, "unrecognized object type: %d", *type);
+	}
+}
+
+
+/*
+ * Copied from PG code.
+ * 
+ * Convert an array of TEXT into a List of string Values, as emitted by the
+ * parser, which is what get_object_address uses as input.
+ */
+static List *
+textarray_to_strvaluelist(ArrayType *arr)
+{
+	Datum	   *elems;
+	bool	   *nulls;
+	int			nelems;
+	List	   *list = NIL;
+	int			i;
+
+	deconstruct_array(arr, TEXTOID, -1, false, TYPALIGN_INT,
+					  &elems, &nulls, &nelems);
+
+	for (i = 0; i < nelems; i++)
+	{
+		if (nulls[i])
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("name or argument lists may not contain nulls")));
+		list = lappend(list, makeString(TextDatumGetCString(elems[i])));
+	}
+
+	return list;
+}
 
 
 /*

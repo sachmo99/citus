@@ -76,10 +76,6 @@ static int GetFunctionColocationId(Oid functionOid, char *colocateWithName, Oid
 static void EnsureFunctionCanBeColocatedWithTable(Oid functionOid, Oid
 												  distributionColumnType, Oid
 												  sourceRelationId);
-static void UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
-										   int *distribution_argument_index,
-										   int *colocationId,
-										   bool localOnly);
 static void EnsureSequentialModeForFunctionDDL(void);
 static void TriggerSyncMetadataToPrimaryNodes(void);
 static bool ShouldPropagateCreateFunction(CreateFunctionStmt *stmt);
@@ -566,7 +562,7 @@ EnsureFunctionCanBeColocatedWithTable(Oid functionOid, Oid distributionColumnTyp
  * UpdateFunctionDistributionInfo gets object address of a function and
  * updates its distribution_argument_index and colocationId in pg_dist_object.
  */
-static void
+void
 UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 							   int *distribution_argument_index,
 							   int *colocationId,

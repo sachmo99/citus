@@ -470,6 +470,10 @@ extern List * CreateFunctionDDLCommandsIdempotent(const ObjectAddress *functionA
 extern char * GetFunctionDDLCommand(const RegProcedure funcOid, bool useCreateOrReplace);
 extern char * GenerateBackupNameForProcCollision(const ObjectAddress *address);
 extern ObjectWithArgs * ObjectWithArgsFromOid(Oid funcOid);
+extern void UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
+										   int *distribution_argument_index,
+										   int *colocationId,
+										   bool localOnly);
 
 /* vacuum.c - forward declarations */
 extern void PostprocessVacuumStmt(VacuumStmt *vacuumStmt, const char *vacuumCommand);
