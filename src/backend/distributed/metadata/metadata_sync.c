@@ -960,11 +960,11 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	int distributionArgumentIndexValue;
 	int colocationIdValue;
 	
-	if (!PG_ARGISNULL(4))
+	if (!PG_ARGISNULL(3))
 	{
 		distributionArgumentIndexValue = PG_GETARG_INT32(3);
 	}
-	if (!PG_ARGISNULL(5))
+	if (!PG_ARGISNULL(4))
 	{
 		colocationIdValue = PG_GETARG_INT32(4);
 	}
