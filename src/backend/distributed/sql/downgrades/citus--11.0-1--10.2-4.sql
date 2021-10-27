@@ -39,3 +39,5 @@ CREATE FUNCTION pg_catalog.citus_disable_node(nodename text, nodeport integer)
         AS 'MODULE_PATHNAME', $$citus_disable_node$$;
 COMMENT ON FUNCTION pg_catalog.citus_disable_node(nodename text, nodeport integer)
         IS 'removes node from the cluster temporarily';
+
+DROP FUNCTION pg_catalog.citus_internal_add_object_metadata(text, text[], text[], integer, integer);
