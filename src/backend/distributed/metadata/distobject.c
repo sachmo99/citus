@@ -141,7 +141,7 @@ ObjectExists(const ObjectAddress *address)
 /*
  * MarkObjectDistributed marks an object as a distributed object by citus. Marking is done
  * by adding appropriate entries to citus.pg_dist_object.
- * 
+ *
  * This also marks the object as distributed on all of the workers with metadata
  * (unless localOnly is true).
  */
@@ -172,7 +172,8 @@ MarkObjectDistributed(const ObjectAddress *distAddress, bool localOnly)
 
 	if (!localOnly)
 	{
-		char *workerPgDistObjectUpdateCommand = DistributedObjectCreateCommand(distAddress, NULL, NULL);
+		char *workerPgDistObjectUpdateCommand = DistributedObjectCreateCommand(
+			distAddress, NULL, NULL);
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }
