@@ -116,11 +116,11 @@ static void EnsureShardMetadataIsSane(Oid relationId, int64 shardId, char storag
 static void EnsureShardPlacementMetadataIsSane(Oid relationId, int64 shardId,
 											   int64 placementId, int32 shardState,
 											   int64 shardLength, int32 groupId);
-static void GetObjectTypeAndNode(char *ttype, ArrayType *namearr,
-								 ArrayType *argsarr, ObjectType *type,
-								 Node *objnode);
+static void GetObjectTypeAndNode(char *typeText, ArrayType *nameArray,
+								 ArrayType *argsArray, ObjectType *objectType,
+								 Node *objectNode);
 static List * DistributedObjectSyncCommandList(void);		
-static List *textarray_to_strvaluelist(ArrayType *arr);												
+static List *textarray_to_strvaluelist(ArrayType *array);												
 
 PG_FUNCTION_INFO_V1(start_metadata_sync_to_node);
 PG_FUNCTION_INFO_V1(stop_metadata_sync_to_node);
@@ -798,7 +798,7 @@ MetadataDropCommands(void)
 									  REMOVE_ALL_CLUSTERED_TABLES_COMMAND);
 
 	dropSnapshotCommandList = lappend(dropSnapshotCommandList, DELETE_ALL_NODES);
-	dropSnapshotCommandList = lappend(dropSnapshotCommandList, "TRUNCATE pg_dist_object");
+	dropSnapshotCommandList = lappend(dropSnapshotCommandList, DELETE_ALL_DISTRIBUTED_OBJECTS);
 
 	return dropSnapshotCommandList;
 }
