@@ -228,6 +228,20 @@ SELECT run_command_on_workers('GRANT ALL ON pg_dist_local_group TO node_metadata
  (localhost,57638,t,GRANT)
 (2 rows)
 
+SELECT run_command_on_workers('GRANT ALL ON ALL TABLES IN SCHEMA citus TO node_metadata_user');
+  run_command_on_workers
+---------------------------------------------------------------------
+ (localhost,57637,t,GRANT)
+ (localhost,57638,t,GRANT)
+(2 rows)
+
+SELECT run_command_on_workers('GRANT ALL ON SCHEMA citus TO node_metadata_user');
+  run_command_on_workers
+---------------------------------------------------------------------
+ (localhost,57637,t,GRANT)
+ (localhost,57638,t,GRANT)
+(2 rows)
+
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
 ---------------------------------------------------------------------
