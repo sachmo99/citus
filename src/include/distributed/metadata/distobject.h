@@ -20,7 +20,7 @@ extern bool ObjectExists(const ObjectAddress *address);
 extern bool CitusExtensionObject(const ObjectAddress *objectAddress);
 extern bool IsObjectDistributed(const ObjectAddress *address);
 extern bool ClusterHasDistributedFunctionWithDistArgument(void);
-extern void MarkObjectDistributed(const ObjectAddress *distAddress);
+extern void MarkObjectDistributed(const ObjectAddress *distAddress, bool localOnly);
 extern void UnmarkObjectDistributed(const ObjectAddress *address);
 extern bool IsTableOwnedByExtension(Oid relationId);
 extern bool IsObjectAddressOwnedByExtension(const ObjectAddress *target,

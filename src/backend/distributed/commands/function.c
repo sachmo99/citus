@@ -78,7 +78,8 @@ static void EnsureFunctionCanBeColocatedWithTable(Oid functionOid, Oid
 												  sourceRelationId);
 static void UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 										   int *distribution_argument_index,
-										   int *colocationId);
+										   int *colocationId,
+										   bool localOnly);
 static void EnsureSequentialModeForFunctionDDL(void);
 static void TriggerSyncMetadataToPrimaryNodes(void);
 static bool ShouldPropagateCreateFunction(CreateFunctionStmt *stmt);
@@ -191,7 +192,7 @@ create_distributed_function(PG_FUNCTION_ARGS)
 	appendStringInfo(&ddlCommand, "%s;%s", createFunctionSQL, alterFunctionOwnerSQL);
 	SendCommandToWorkersAsUser(NON_COORDINATOR_NODES, CurrentUserName(), ddlCommand.data);
 
-	MarkObjectDistributed(&functionAddress);
+	MarkObjectDistributed(&functionAddress, false);
 
 	if (distributionArgumentName != NULL)
 	{
@@ -238,7 +239,7 @@ DistributeFunctionWithDistributionArgument(RegProcedure funcOid,
 
 	/* record the distribution argument and colocationId */
 	UpdateFunctionDistributionInfo(functionAddress, &distributionArgumentIndex,
-								   &colocationId);
+								   &colocationId, false);
 
 	/*
 	 * Once we have at least one distributed function/procedure with distribution
@@ -276,7 +277,7 @@ DistributeFunctionColocatedWithDistributedTable(RegProcedure funcOid,
 	}
 
 	/* set distribution argument and colocationId to NULL */
-	UpdateFunctionDistributionInfo(functionAddress, NULL, NULL);
+	UpdateFunctionDistributionInfo(functionAddress, NULL, NULL, false);
 }
 
 
@@ -293,7 +294,7 @@ DistributeFunctionColocatedWithReferenceTable(const ObjectAddress *functionAddre
 	/* set distribution argument to NULL and colocationId to the reference table colocation id */
 	int *distributionArgumentIndex = NULL;
 	UpdateFunctionDistributionInfo(functionAddress, distributionArgumentIndex,
-								   &colocationId);
+								   &colocationId, false);
 
 	/*
 	 * Once we have at least one distributed function/procedure that reads
@@ -568,7 +569,8 @@ EnsureFunctionCanBeColocatedWithTable(Oid functionOid, Oid distributionColumnTyp
 static void
 UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 							   int *distribution_argument_index,
-							   int *colocationId)
+							   int *colocationId,
+							   bool localOnly)
 {
 	const bool indexOK = true;
 
@@ -638,6 +640,13 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 	systable_endscan(scanDescriptor);
 
 	table_close(pgDistObjectRel, NoLock);
+
+	if (!localOnly)
+	{
+		char *workerMetadataUpdateCommand = DistributedObjectCreateCommand(
+			distAddress, distribution_argument_index, colocationId);
+		SendCommandToWorkersWithMetadata(workerMetadataUpdateCommand);
+	}
 }
 
 
