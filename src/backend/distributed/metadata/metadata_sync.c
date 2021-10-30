@@ -116,9 +116,8 @@ static void EnsureShardMetadataIsSane(Oid relationId, int64 shardId, char storag
 static void EnsureShardPlacementMetadataIsSane(Oid relationId, int64 shardId,
 											   int64 placementId, int32 shardState,
 											   int64 shardLength, int32 groupId);
-static void GetObjectTypeAndNode(char *typeText, ArrayType *nameArray,
-								 ArrayType *argsArray, ObjectType *objectType,
-								 Node *objectNode);
+static ObjectAddress GetObjectAddrIfUserOwns(char *typeText, ArrayType *nameArray,
+											 ArrayType *argsArray);
 static List * DistributedObjectSyncCommandList(void);
 static List * textarray_to_strvaluelist(ArrayType *array);
 
@@ -963,61 +962,57 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	ArrayType *argsArray = PG_GETARG_ARRAYTYPE_P(2);
 	int distributionArgumentIndexValue;
 	int colocationIdValue;
+	int *colocationId = NULL;
+	int *distributionArgumentIndex = NULL;
 
 	if (!PG_ARGISNULL(3))
 	{
 		distributionArgumentIndexValue = PG_GETARG_INT32(3);
+		distributionArgumentIndex = &distributionArgumentIndexValue;
 	}
 	if (!PG_ARGISNULL(4))
 	{
 		colocationIdValue = PG_GETARG_INT32(4);
+		colocationId = &colocationIdValue;
 	}
 
-	if (!ShouldSkipMetadataChecks())
-	{
-		/* this UDF is not allowed for executing as a separate command */
-		EnsureCoordinatorInitiatedOperation();
-	}
+	/*if (!ShouldSkipMetadataChecks()) */
+	/*{ */
+	/*	/ * this UDF is not allowed for executing as a separate command * / */
+	/*	EnsureCoordinatorInitiatedOperation(); */
+	/*} */
 
-	/* Check the current user is the owner of the object */
-	ObjectType objectType;
-	Node objectNode;
-
-	GetObjectTypeAndNode(textType, nameArray, argsArray, &objectType, &objectNode);
-	Relation relation;
-
-	ObjectAddress objectAddress = get_object_address(objectType, &objectNode, &relation,
-													 AccessShareLock, false);
-	check_object_ownership(GetUserId(), objectType, objectAddress, &objectNode, relation);
-
-	if (relation)
-	{
-		relation_close(relation, AccessShareLock);
-	}
+	ObjectAddress objectAddress = GetObjectAddrIfUserOwns(textType, nameArray, argsArray);
 
 	/* Update the metadata for the given object on the node */
 	MarkObjectDistributed(&objectAddress, true);
-	UpdateFunctionDistributionInfo(&objectAddress, &distributionArgumentIndexValue,
-								   &colocationIdValue, true);
+	UpdateFunctionDistributionInfo(&objectAddress, distributionArgumentIndex,
+								   colocationId, true);
 
 	PG_RETURN_VOID();
 }
 
 
 /*
- * Get the object type and node from the given type text, names and arguments.
+ * Get the object address if user owns it.
  *
  * This function is mostly copied from pg_get_object_address of the PG code. We need
  * to copy that function to get both object type and node.
  */
-static void
-GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
-					 ObjectType *type, Node *objnode)
+static ObjectAddress
+GetObjectAddrIfUserOwns(char *ttype, ArrayType *namearr, ArrayType *argsarr)
 {
 	int itype;
+	ObjectType type;
 	List *name = NIL;
 	TypeName *typename = NULL;
 	List *args = NIL;
+	Node *objnode = NULL;
+	ObjectAddress addr;
+	TupleDesc tupdesc;
+	Datum values[3];
+	bool nulls[3];
+	HeapTuple htup;
 	Relation relation;
 
 	/* Decode object type, raise error if unknown */
@@ -1028,15 +1023,15 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("unsupported object type \"%s\"", ttype)));
 	}
-	*type = (ObjectType) itype;
+	type = (ObjectType) itype;
 
 	/*
 	 * Convert the text array to the representation appropriate for the given
 	 * object type.  Most use a simple string Values list, but there are some
 	 * exceptions.
 	 */
-	if (*type == OBJECT_TYPE || *type == OBJECT_DOMAIN || *type == OBJECT_CAST ||
-		*type == OBJECT_TRANSFORM || *type == OBJECT_DOMCONSTRAINT)
+	if (type == OBJECT_TYPE || type == OBJECT_DOMAIN || type == OBJECT_CAST ||
+		type == OBJECT_TRANSFORM || type == OBJECT_DOMCONSTRAINT)
 	{
 		Datum *elems;
 		bool *nulls;
@@ -1058,7 +1053,7 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 		}
 		typename = typeStringToTypeName(TextDatumGetCString(elems[0]));
 	}
-	else if (*type == OBJECT_LARGEOBJECT)
+	else if (type == OBJECT_LARGEOBJECT)
 	{
 		Datum *elems;
 		bool *nulls;
@@ -1094,14 +1089,14 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 	/*
 	 * If args are given, decode them according to the object type.
 	 */
-	if (*type == OBJECT_AGGREGATE ||
-		*type == OBJECT_FUNCTION ||
-		*type == OBJECT_PROCEDURE ||
-		*type == OBJECT_ROUTINE ||
-		*type == OBJECT_OPERATOR ||
-		*type == OBJECT_CAST ||
-		*type == OBJECT_AMOP ||
-		*type == OBJECT_AMPROC)
+	if (type == OBJECT_AGGREGATE ||
+		type == OBJECT_FUNCTION ||
+		type == OBJECT_PROCEDURE ||
+		type == OBJECT_ROUTINE ||
+		type == OBJECT_OPERATOR ||
+		type == OBJECT_CAST ||
+		type == OBJECT_AMOP ||
+		type == OBJECT_AMPROC)
 	{
 		/* in these cases, the args list must be of TypeName */
 		Datum *elems;
@@ -1135,7 +1130,7 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 	 * get_object_address is pretty sensitive to the length of its input
 	 * lists; check that they're what it wants.
 	 */
-	switch (*type)
+	switch (type)
 	{
 		case OBJECT_DOMCONSTRAINT:
 		case OBJECT_CAST:
@@ -1150,7 +1145,6 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("argument list length must be exactly %d", 1)));
 			}
-
 			break;
 		}
 
@@ -1163,7 +1157,6 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("name list length must be at least %d", 2)));
 			}
-
 			break;
 		}
 
@@ -1189,7 +1182,6 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("argument list length must be exactly %d", 2)));
 			}
-
 			break;
 		}
 
@@ -1203,7 +1195,7 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 	 * Now build the Node type that get_object_address() expects for the given
 	 * type.
 	 */
-	switch (*type)
+	switch (type)
 	{
 		case OBJECT_TABLE:
 		case OBJECT_SEQUENCE:
@@ -1320,8 +1312,21 @@ GetObjectTypeAndNode(char *ttype, ArrayType *namearr, ArrayType *argsarr,
 
 	if (objnode == NULL)
 	{
-		elog(ERROR, "unrecognized object type: %d", *type);
+		elog(ERROR, "unrecognized object type: %d", type);
 	}
+
+	addr = get_object_address(type, objnode,
+							  &relation, AccessShareLock, false);
+
+	check_object_ownership(GetUserId(), type, addr, objnode, relation);
+
+	/* We don't need the relcache entry, thank you very much */
+	if (relation)
+	{
+		relation_close(relation, AccessShareLock);
+	}
+
+	return addr;
 }
 
 
