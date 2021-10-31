@@ -115,7 +115,7 @@ EnsureDependenciesExistOnAllNodes(const ObjectAddress *target)
 	 * created on the workers when they get added, causing shards to fail to create.
 	 *
 	 * NOTE: We do this after creating the objects on the workers, otherwise
-	 * MarkObjectDistributed would fail when localOnlyMarkdistributed is false.
+	 * MarkObjectDistributed would fail.
 	 */
 	foreach_ptr(dependency, dependenciesWithCommands)
 	{
