@@ -17,11 +17,12 @@
 #include "catalog/pg_type.h"
 #include "distributed/citus_ruleutils.h"
 #include "distributed/metadata/distobject.h"
+#include "distributed/pg_version_constants.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
 #include "parser/parse_type.h"
 
-static List *textarray_to_strvaluelist(ArrayType *arr);
+static List * textarray_to_strvaluelist(ArrayType *arr);
 
 /*
  * Get the object address. If checkOwner is true, owner of the object is checked
@@ -162,6 +163,9 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 		case OBJECT_DOMCONSTRAINT:
 		case OBJECT_CAST:
 		case OBJECT_USER_MAPPING:
+#if PG_VERSION_NUM >= PG_VERSION_14
+		case OBJECT_PUBLICATION_NAMESPACE:
+#endif
 		case OBJECT_PUBLICATION_REL:
 		case OBJECT_DEFACL:
 		case OBJECT_TRANSFORM:
@@ -294,7 +298,9 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 			objnode = (Node *) list_make2(name, linitial(args));
 			break;
 		}
-
+#if PG_VERSION_NUM >= PG_VERSION_14
+		case OBJECT_PUBLICATION_NAMESPACE:
+#endif
 		case OBJECT_USER_MAPPING:
 		{
 			objnode = (Node *) list_make2(linitial(name), linitial(args));
@@ -345,12 +351,13 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 	addr = get_object_address(type, objnode,
 							  &relation, AccessShareLock, false);
 
-    /* CITUS CODE BEGIN */
-    if (checkOwner)
-    {
-        check_object_ownership(GetUserId(), type, addr, objnode, relation);
-    }
-    /* CITUS CODE END */
+	/* CITUS CODE BEGIN */
+	if (checkOwner)
+	{
+		check_object_ownership(GetUserId(), type, addr, objnode, relation);
+	}
+
+	/* CITUS CODE END */
 
 	/* We don't need the relcache entry, thank you very much */
 	if (relation)
@@ -358,9 +365,10 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 		relation_close(relation, AccessShareLock);
 	}
 
-    /* CITUS CODE BEGIN */
+	/* CITUS CODE BEGIN */
 	return addr;
-    /* CITUS CODE END */
+
+	/* CITUS CODE END */
 }
 
 

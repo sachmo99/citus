@@ -234,7 +234,8 @@ DistributeFunctionWithDistributionArgument(RegProcedure funcOid,
 								distributionArgumentOid);
 
 	/* record the distribution argument and colocationId */
-	UpdateFunctionDistributionInfo(functionAddress, &distributionArgumentIndex, &colocationId);
+	UpdateFunctionDistributionInfo(functionAddress, &distributionArgumentIndex,
+								   &colocationId);
 
 	/*
 	 * Once we have at least one distributed function/procedure with distribution
@@ -288,7 +289,8 @@ DistributeFunctionColocatedWithReferenceTable(const ObjectAddress *functionAddre
 
 	/* set distribution argument to NULL and colocationId to the reference table colocation id */
 	int *distributionArgumentIndex = NULL;
-	UpdateFunctionDistributionInfo(functionAddress, distributionArgumentIndex, &colocationId);
+	UpdateFunctionDistributionInfo(functionAddress, distributionArgumentIndex,
+								   &colocationId);
 
 	/*
 	 * Once we have at least one distributed function/procedure that reads
@@ -636,7 +638,7 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 	table_close(pgDistObjectRel, NoLock);
 
 	if (EnableDDLPropagation)
-	{		
+	{
 		char *workerPgDistObjectUpdateCommand = MarkObjectDistributedCreateCommand(
 			distAddress, distribution_argument_index, colocationId);
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);

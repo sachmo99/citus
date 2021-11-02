@@ -34,8 +34,8 @@ extern bool ShouldSyncTableMetadata(Oid relationId);
 extern List * MetadataCreateCommands(void);
 extern List * MetadataDropCommands(void);
 extern char * MarkObjectDistributedCreateCommand(const ObjectAddress *address,
-											 int32 *distributionArgumentIndex,
-											 int32 *colocationId);
+												 int32 *distributionArgumentIndex,
+												 int32 *colocationId);
 extern char * DistributionCreateCommand(CitusTableCacheEntry *cacheEntry);
 extern char * DistributionDeleteCommand(const char *schemaName,
 										const char *tableName);

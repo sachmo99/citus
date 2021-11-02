@@ -173,7 +173,8 @@ MarkObjectDistributed(const ObjectAddress *distAddress)
 
 	if (EnableDDLPropagation)
 	{
-		char *workerPgDistObjectUpdateCommand = MarkObjectDistributedCreateCommand(distAddress, NULL, NULL);
+		char *workerPgDistObjectUpdateCommand = MarkObjectDistributedCreateCommand(
+			distAddress, NULL, NULL);
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }

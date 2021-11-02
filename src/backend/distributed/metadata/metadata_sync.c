@@ -882,8 +882,8 @@ NodeListInsertCommand(List *workerNodeList)
  */
 char *
 MarkObjectDistributedCreateCommand(const ObjectAddress *address,
-							   int32 *distributionArgumentIndex,
-							   int32 *colocationId)
+								   int32 *distributionArgumentIndex,
+								   int32 *colocationId)
 {
 	StringInfo insertDistributedObjectCommand = makeStringInfo();
 	List *names;
@@ -981,12 +981,14 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 		EnsureCoordinatorInitiatedOperation();
 	}
 
-	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray, argsArray, true);
+	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray, argsArray,
+													 true);
 
 	/* First, disable propagation off to not to cause infinite propagation */
 	EnableDDLPropagation = false;
 	MarkObjectDistributed(&objectAddress);
-	UpdateFunctionDistributionInfo(&objectAddress, distributionArgumentIndex, colocationId);
+	UpdateFunctionDistributionInfo(&objectAddress, distributionArgumentIndex,
+								   colocationId);
 	EnableDDLPropagation = true;
 
 	PG_RETURN_VOID();

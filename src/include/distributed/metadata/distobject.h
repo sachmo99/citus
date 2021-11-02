@@ -25,7 +25,8 @@ extern void UnmarkObjectDistributed(const ObjectAddress *address);
 extern bool IsTableOwnedByExtension(Oid relationId);
 extern bool IsObjectAddressOwnedByExtension(const ObjectAddress *target,
 											ObjectAddress *extensionAddress);
-extern ObjectAddress PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool checkOwner);
+extern ObjectAddress PgGetObjectAddress(char *ttype, ArrayType *namearr,
+										ArrayType *argsarr, bool checkOwner);
 
 extern List * GetDistributedObjectAddressList(void);
 extern void UpdateDistributedObjectColocationId(uint32 oldColocationId, uint32
