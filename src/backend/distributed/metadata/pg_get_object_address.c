@@ -24,6 +24,11 @@
 
 static List * textarray_to_strvaluelist(ArrayType *arr);
 
+/* It is defined on PG >= 13 versions by default */
+#if PG_VERSION_NUM < PG_VERSION_13
+	#define TYPALIGN_INT 'i'
+#endif
+
 /*
  * Get the object address. If checkOwner is true, owner of the object is checked
  * and if it is not the current user function will error out.
@@ -42,6 +47,7 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 	Node *objnode = NULL;
 	ObjectAddress addr;
 	Relation relation;
+
 
 	/* Decode object type, raise error if unknown */
 	itype = read_objtype_from_string(ttype);
@@ -132,7 +138,8 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 		int nelems;
 		int i;
 
-		deconstruct_array(argsarr, TEXTOID, -1, false, TYPALIGN_INT,
+		deconstruct_array(argsarr, TEXTOID, -1, false,
+						  TYPALIGN_INT,
 						  &elems, &nulls, &nelems);
 
 		args = NIL;
@@ -298,6 +305,7 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 			objnode = (Node *) list_make2(name, linitial(args));
 			break;
 		}
+
 #if PG_VERSION_NUM >= PG_VERSION_14
 		case OBJECT_PUBLICATION_NAMESPACE:
 #endif
