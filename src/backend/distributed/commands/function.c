@@ -637,7 +637,7 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 
 	table_close(pgDistObjectRel, NoLock);
 
-	if (EnableDDLPropagation)
+	if (EnableDependencyCreation)
 	{
 		char *workerPgDistObjectUpdateCommand = MarkObjectDistributedCreateCommand(
 			distAddress, distribution_argument_index, colocationId);

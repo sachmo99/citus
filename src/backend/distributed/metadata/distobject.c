@@ -171,7 +171,7 @@ MarkObjectDistributed(const ObjectAddress *distAddress)
 		ereport(ERROR, (errmsg("failed to insert object into citus.pg_dist_object")));
 	}
 
-	if (EnableDDLPropagation)
+	if (EnableDependencyCreation)
 	{
 		char *workerPgDistObjectUpdateCommand = MarkObjectDistributedCreateCommand(
 			distAddress, NULL, NULL);

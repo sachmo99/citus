@@ -989,11 +989,11 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 													 true);
 
 	/* First, disable propagation off to not to cause infinite propagation */
-	EnableDDLPropagation = false;
+	EnableDependencyCreation = false;
 	MarkObjectDistributed(&objectAddress);
 	UpdateFunctionDistributionInfo(&objectAddress, distributionArgumentIndex,
 								   colocationId);
-	EnableDDLPropagation = true;
+	EnableDependencyCreation = true;
 
 	PG_RETURN_VOID();
 }
