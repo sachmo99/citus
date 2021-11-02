@@ -33,7 +33,7 @@ extern bool ClusterHasKnownMetadataWorkers(void);
 extern bool ShouldSyncTableMetadata(Oid relationId);
 extern List * MetadataCreateCommands(void);
 extern List * MetadataDropCommands(void);
-extern char * DistributedObjectCreateCommand(const ObjectAddress *address,
+extern char * MarkObjectDistributedCreateCommand(const ObjectAddress *address,
 											 int32 *distributionArgumentIndex,
 											 int32 *colocationId);
 extern char * DistributionCreateCommand(CitusTableCacheEntry *cacheEntry);

@@ -28,6 +28,7 @@
 #include "catalog/pg_type.h"
 #include "citus_version.h"
 #include "commands/extension.h"
+#include "distributed/commands/utility_hook.h"
 #include "distributed/metadata/distobject.h"
 #include "distributed/metadata/pg_dist_object.h"
 #include "distributed/metadata_cache.h"
@@ -146,7 +147,7 @@ ObjectExists(const ObjectAddress *address)
  * (unless localOnly is true).
  */
 void
-MarkObjectDistributed(const ObjectAddress *distAddress, bool localOnly)
+MarkObjectDistributed(const ObjectAddress *distAddress)
 {
 	int paramCount = 3;
 	Oid paramTypes[3] = {
@@ -170,10 +171,9 @@ MarkObjectDistributed(const ObjectAddress *distAddress, bool localOnly)
 		ereport(ERROR, (errmsg("failed to insert object into citus.pg_dist_object")));
 	}
 
-	if (!localOnly)
+	if (EnableDDLPropagation)
 	{
-		char *workerPgDistObjectUpdateCommand = DistributedObjectCreateCommand(
-			distAddress, NULL, NULL);
+		char *workerPgDistObjectUpdateCommand = MarkObjectDistributedCreateCommand(distAddress, NULL, NULL);
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }

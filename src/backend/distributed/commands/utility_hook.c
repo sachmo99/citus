@@ -54,6 +54,7 @@
 #include "distributed/multi_partitioning_utils.h"
 #include "distributed/metadata_cache.h"
 #include "distributed/metadata_sync.h"
+#include "distributed/metadata/distobject.h"
 #include "distributed/multi_executor.h"
 #include "distributed/multi_explain.h"
 #include "distributed/multi_physical_planner.h"
@@ -662,6 +663,13 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 				/* no failures during CONCURRENTLY, mark the index as valid */
 				MarkIndexValid(indexStmt);
 			}
+		}
+
+		/* Mark object distributed as the last step */
+		if (ops && ops->markDistributed)
+		{
+			ObjectAddress address = GetObjectAddressFromParseTree(parsetree, false);
+			MarkObjectDistributed(&address);
 		}
 	}
 

@@ -56,6 +56,7 @@ typedef struct DistributeObjectOps
 	List * (*preprocess)(Node *, const char *, ProcessUtilityContext);
 	List * (*postprocess)(Node *, const char *);
 	ObjectAddress (*address)(Node *, bool);
+	bool markDistributed;
 } DistributeObjectOps;
 
 #define CITUS_TRUNCATE_TRIGGER_NAME "citus_truncate_trigger"
@@ -472,8 +473,7 @@ extern char * GenerateBackupNameForProcCollision(const ObjectAddress *address);
 extern ObjectWithArgs * ObjectWithArgsFromOid(Oid funcOid);
 extern void UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 										   int *distribution_argument_index,
-										   int *colocationId,
-										   bool localOnly);
+										   int *colocationId);
 
 /* vacuum.c - forward declarations */
 extern void PostprocessVacuumStmt(VacuumStmt *vacuumStmt, const char *vacuumCommand);

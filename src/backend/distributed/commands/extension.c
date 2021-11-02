@@ -188,8 +188,6 @@ PostprocessCreateExtensionStmt(Node *node, const char *queryString)
 
 	EnsureDependenciesExistOnAllNodes(&extensionAddress);
 
-	MarkObjectDistributed(&extensionAddress, false);
-
 	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
 }
 
@@ -584,7 +582,7 @@ MarkExistingObjectDependenciesDistributedIfSupported()
 	ObjectAddress *objectAddress = NULL;
 	foreach_ptr(objectAddress, uniqueObjectAddresses)
 	{
-		MarkObjectDistributed(objectAddress, false);
+		MarkObjectDistributed(objectAddress);
 	}
 }
 

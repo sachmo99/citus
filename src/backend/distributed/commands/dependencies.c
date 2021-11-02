@@ -119,7 +119,7 @@ EnsureDependenciesExistOnAllNodes(const ObjectAddress *target)
 	 */
 	foreach_ptr(dependency, dependenciesWithCommands)
 	{
-		MarkObjectDistributed(dependency, false);
+		MarkObjectDistributed(dependency);
 	}
 }
 

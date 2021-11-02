@@ -188,7 +188,7 @@ create_distributed_function(PG_FUNCTION_ARGS)
 	appendStringInfo(&ddlCommand, "%s;%s", createFunctionSQL, alterFunctionOwnerSQL);
 	SendCommandToWorkersAsUser(NON_COORDINATOR_NODES, CurrentUserName(), ddlCommand.data);
 
-	MarkObjectDistributed(&functionAddress, false);
+	MarkObjectDistributed(&functionAddress);
 
 	if (distributionArgumentName != NULL)
 	{
@@ -234,8 +234,7 @@ DistributeFunctionWithDistributionArgument(RegProcedure funcOid,
 								distributionArgumentOid);
 
 	/* record the distribution argument and colocationId */
-	UpdateFunctionDistributionInfo(functionAddress, &distributionArgumentIndex,
-								   &colocationId, false);
+	UpdateFunctionDistributionInfo(functionAddress, &distributionArgumentIndex, &colocationId);
 
 	/*
 	 * Once we have at least one distributed function/procedure with distribution
@@ -273,7 +272,7 @@ DistributeFunctionColocatedWithDistributedTable(RegProcedure funcOid,
 	}
 
 	/* set distribution argument and colocationId to NULL */
-	UpdateFunctionDistributionInfo(functionAddress, NULL, NULL, false);
+	UpdateFunctionDistributionInfo(functionAddress, NULL, NULL);
 }
 
 
@@ -289,8 +288,7 @@ DistributeFunctionColocatedWithReferenceTable(const ObjectAddress *functionAddre
 
 	/* set distribution argument to NULL and colocationId to the reference table colocation id */
 	int *distributionArgumentIndex = NULL;
-	UpdateFunctionDistributionInfo(functionAddress, distributionArgumentIndex,
-								   &colocationId, false);
+	UpdateFunctionDistributionInfo(functionAddress, distributionArgumentIndex, &colocationId);
 
 	/*
 	 * Once we have at least one distributed function/procedure that reads
@@ -561,12 +559,12 @@ EnsureFunctionCanBeColocatedWithTable(Oid functionOid, Oid distributionColumnTyp
 /*
  * UpdateFunctionDistributionInfo gets object address of a function and
  * updates its distribution_argument_index and colocationId in pg_dist_object.
+ * Then update pg_dist_object on nodes with metadata if ddl propagation is on.
  */
 void
 UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 							   int *distribution_argument_index,
-							   int *colocationId,
-							   bool localOnly)
+							   int *colocationId)
 {
 	const bool indexOK = true;
 
@@ -637,11 +635,11 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 
 	table_close(pgDistObjectRel, NoLock);
 
-	if (!localOnly)
-	{
-		char *workerMetadataUpdateCommand = DistributedObjectCreateCommand(
+	if (EnableDDLPropagation)
+	{		
+		char *workerPgDistObjectUpdateCommand = MarkObjectDistributedCreateCommand(
 			distAddress, distribution_argument_index, colocationId);
-		SendCommandToWorkersWithMetadata(workerMetadataUpdateCommand);
+		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }
 
