@@ -201,8 +201,13 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 						 errmsg("name list length must be at least %d", 3)));
 			}
 
-			/* fall through to check args length */
-			/* FALLTHROUGH */
+			if (list_length(args) != 2)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("argument list length must be exactly %d", 2)));
+			}
+			break;
 		}
 
 		case OBJECT_OPERATOR:
