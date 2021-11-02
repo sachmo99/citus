@@ -39,25 +39,21 @@ static List * textarray_to_strvaluelist(ArrayType *arr);
 ObjectAddress
 PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool checkOwner)
 {
-	int itype;
-	ObjectType type;
 	List *name = NIL;
 	TypeName *typename = NULL;
 	List *args = NIL;
 	Node *objnode = NULL;
-	ObjectAddress addr;
 	Relation relation;
 
-
 	/* Decode object type, raise error if unknown */
-	itype = read_objtype_from_string(ttype);
+	int itype = read_objtype_from_string(ttype);
 	if (itype < 0)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("unsupported object type \"%s\"", ttype)));
 	}
-	type = (ObjectType) itype;
+	ObjectType type = (ObjectType) itype;
 
 	/*
 	 * Convert the text array to the representation appropriate for the given
@@ -170,9 +166,6 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 		case OBJECT_DOMCONSTRAINT:
 		case OBJECT_CAST:
 		case OBJECT_USER_MAPPING:
-#if PG_VERSION_NUM >= PG_VERSION_14
-		case OBJECT_PUBLICATION_NAMESPACE:
-#endif
 		case OBJECT_PUBLICATION_REL:
 		case OBJECT_DEFACL:
 		case OBJECT_TRANSFORM:
@@ -306,9 +299,6 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 			break;
 		}
 
-#if PG_VERSION_NUM >= PG_VERSION_14
-		case OBJECT_PUBLICATION_NAMESPACE:
-#endif
 		case OBJECT_USER_MAPPING:
 		{
 			objnode = (Node *) list_make2(linitial(name), linitial(args));
@@ -356,8 +346,8 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 		elog(ERROR, "unrecognized object type: %d", type);
 	}
 
-	addr = get_object_address(type, objnode,
-							  &relation, AccessShareLock, false);
+	ObjectAddress addr = get_object_address(type, objnode,
+											&relation, AccessShareLock, false);
 
 	/* CITUS CODE BEGIN */
 	if (checkOwner)

@@ -888,8 +888,14 @@ MarkObjectDistributedCreateCommand(const ObjectAddress *address,
 	StringInfo insertDistributedObjectCommand = makeStringInfo();
 	List *names;
 	List *args;
-	char *objectType = getObjectTypeDescription(address);
+	char *objectType;
+#if PG_VERSION_NUM >= PG_VERSION_14
+	objectType = getObjectTypeDescription(address, false);
+	getObjectIdentityParts(address, &names, &args, false);
+#else
+	objectType = getObjectTypeDescription(address);
 	getObjectIdentityParts(address, &names, &args);
+#endif
 
 	appendStringInfo(insertDistributedObjectCommand,
 					 "SELECT citus_internal_add_object_metadata(");
