@@ -953,7 +953,7 @@ SELECT * FROM ref, local WHERE a = c ORDER BY a;
  7 | 8 | 7 | 8
 (2 rows)
 
--- Check repartion joins are supported
+-- Check repartition joins are supported
 SET citus.enable_repartition_joins TO ON;
 SELECT * FROM test t1, test t2 WHERE t1.x = t2.y ORDER BY t1.x;
  x | y | x | y
@@ -1248,7 +1248,7 @@ NOTICE:  renaming the new table to single_node.test_2
 (1 row)
 
 SELECT * FROM pg_dist_partition WHERE logicalrelid = 'test_2'::regclass;
- logicalrelid | partmethod | partkey | colocationid | repmodel
+ logicalrelid | partmethod | partkey | colocationid | repmodel | autoconverted
 ---------------------------------------------------------------------
 (0 rows)
 

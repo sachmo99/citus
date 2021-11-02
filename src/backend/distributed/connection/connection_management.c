@@ -429,12 +429,18 @@ FindAvailableConnection(dlist_head *connections, uint32 flags)
 			continue;
 		}
 
-		if (connection->forceCloseAtTransactionEnd)
+		if (connection->forceCloseAtTransactionEnd &&
+			!connection->remoteTransaction.beginSent)
 		{
 			/*
-			 * This is a connection that should be closed, probabably because
-			 * of old connection options. So we ignore it. It will
-			 * automatically be closed at the end of the transaction.
+			 * This is a connection that should be closed, probably because
+			 * of old connection options or removing a node. This will
+			 * automatically be closed at the end of the transaction. But, if we are still
+			 * inside a transaction, we should keep using this connection as long as a remote
+			 * transaction is in progress over the connection. The main use for this case
+			 * is having some commands inside a transaction block after removing nodes. And, we
+			 * currently allow very limited operations after removing a node inside a
+			 * transaction block (e.g., no placement access can happen).
 			 */
 			continue;
 		}
@@ -948,7 +954,7 @@ FinishConnectionListEstablishment(List *multiConnectionList)
 		if (eventCount == 0)
 		{
 			/*
-			 * timeout has occured on waitset, double check the timeout since
+			 * timeout has occurred on waitset, double check the timeout since
 			 * connectionStart and if passed close all non-finished connections
 			 */
 

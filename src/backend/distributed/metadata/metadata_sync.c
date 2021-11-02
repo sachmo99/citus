@@ -175,7 +175,6 @@ StartMetadataSyncToNode(const char *nodeNameString, int32 nodePort)
 
 	CheckCitusVersion(ERROR);
 	EnsureCoordinator();
-	EnsureSuperUser();
 	EnsureModificationsCanRun();
 
 	EnsureSequentialModeMetadataOperations();
@@ -244,7 +243,7 @@ StartMetadataSyncToNode(const char *nodeNameString, int32 nodePort)
  * EnsureSequentialModeMetadataOperations makes sure that the current transaction is
  * already in sequential mode, or can still safely be put in sequential mode,
  * it errors if that is not possible. The error contains information for the user to
- * retry the transaction with sequential mode set from the begining.
+ * retry the transaction with sequential mode set from the beginning.
  *
  * Metadata objects (e.g., distributed table on the workers) exists only 1 instance of
  * the type used by potentially multiple other shards/connections. To make sure all
@@ -294,7 +293,6 @@ stop_metadata_sync_to_node(PG_FUNCTION_ARGS)
 {
 	CheckCitusVersion(ERROR);
 	EnsureCoordinator();
-	EnsureSuperUser();
 
 	text *nodeName = PG_GETARG_TEXT_P(0);
 	int32 nodePort = PG_GETARG_INT32(1);
@@ -2259,6 +2257,9 @@ citus_internal_add_partition_metadata(PG_FUNCTION_ARGS)
 	char *distributionColumnString = NULL;
 	Var *distributionColumnVar = NULL;
 
+	/* this flag is only valid for citus local tables, so set it to false */
+	bool autoConverted = false;
+
 	/* only owner of the table (or superuser) is allowed to add the Citus metadata */
 	EnsureTableOwner(relationId);
 
@@ -2307,7 +2308,7 @@ citus_internal_add_partition_metadata(PG_FUNCTION_ARGS)
 	}
 
 	InsertIntoPgDistPartition(relationId, distributionMethod, distributionColumnVar,
-							  colocationId, replicationModel);
+							  colocationId, replicationModel, autoConverted);
 
 	PG_RETURN_VOID();
 }

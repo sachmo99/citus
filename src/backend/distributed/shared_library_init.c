@@ -531,7 +531,7 @@ CreateRequiredDirectories(void)
 	const char *subdirs[] = {
 		"pg_foreign_file",
 		"pg_foreign_file/cached",
-		"base/" PG_JOB_CACHE_DIR
+		("base/" PG_JOB_CACHE_DIR)
 	};
 
 	for (int dirNo = 0; dirNo < lengthof(subdirs); dirNo++)
@@ -1413,7 +1413,7 @@ RegisterCitusConfigVariables(void)
 
 	DefineCustomBoolVariable(
 		"citus.override_table_visibility",
-		gettext_noop("Enables replacing occurencens of pg_catalog.pg_table_visible() "
+		gettext_noop("Enables replacing occurrrences of pg_catalog.pg_table_visible() "
 					 "with pg_catalog.citus_table_visible()"),
 		gettext_noop("When enabled, shards on the Citus MX worker (data) nodes would be "
 					 "filtered out by many psql commands to provide better user "

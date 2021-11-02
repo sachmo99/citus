@@ -257,7 +257,7 @@ DistributeFunctionColocatedWithDistributedTable(RegProcedure funcOid,
 {
 	/*
 	 * cannot provide colocate_with without distribution_arg_name when the function
-	 * is not collocated with a reference table
+	 * is not colocated with a reference table
 	 */
 	if (pg_strncasecmp(colocateWithTableName, "default", NAMEDATALEN) != 0)
 	{
@@ -1492,7 +1492,7 @@ PreprocessDropFunctionStmt(Node *node, const char *queryString,
 	{
 		/*
 		 * extensions should be created separately on the workers, types cascading from an
-		 * extension should therefor not be propagated here.
+		 * extension should therefore not be propagated here.
 		 */
 		return NIL;
 	}
@@ -1593,7 +1593,7 @@ PreprocessAlterFunctionDependsStmt(Node *node, const char *queryString,
 	{
 		/*
 		 * extensions should be created separately on the workers, types cascading from an
-		 * extension should therefor not be propagated here.
+		 * extension should therefore not be propagated here.
 		 */
 		return NIL;
 	}

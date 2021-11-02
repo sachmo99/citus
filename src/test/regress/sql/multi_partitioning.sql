@@ -565,7 +565,7 @@ UPDATE partitioning_test SET time = '2010-10-10' WHERE id = 25;
 -- see the data is updated
 SELECT * FROM partitioning_test WHERE id = 25 ORDER BY 1;
 
--- perform operations on partition and partioned tables together
+-- perform operations on partition and partitioned tables together
 INSERT INTO partitioning_test VALUES(26, '2010-02-02', 26);
 INSERT INTO partitioning_test_2010 VALUES(26, '2010-02-02', 26);
 COPY partitioning_test FROM STDIN WITH CSV;
@@ -1932,7 +1932,11 @@ CALL drop_old_time_partitions('date_partitioned_table_to_exp', '2021-01-01');
 SELECT partition FROM time_partitions WHERE parent_table = 'date_partitioned_table_to_exp'::regclass ORDER BY partition::text;
 
 \set VERBOSITY default
+set client_min_messages to error;
 DROP TABLE date_partitioned_table_to_exp;
+DROP TABLE date_partitioned_citus_local_table CASCADE;
+DROP TABLE date_partitioned_citus_local_table_2;
+set client_min_messages to notice;
 
 SELECT citus_remove_node('localhost', :master_port);
 
