@@ -434,6 +434,8 @@ PreprocessRenameTypeStmt(Node *node, const char *queryString,
 		return NIL;
 	}
 
+	EnsureCoordinator();
+
 	/* fully qualify */
 	QualifyTreeNode(node);
 
@@ -471,6 +473,8 @@ PreprocessRenameTypeAttributeStmt(Node *node, const char *queryString,
 	{
 		return NIL;
 	}
+
+	EnsureCoordinator();
 
 	QualifyTreeNode((Node *) stmt);
 

@@ -166,6 +166,8 @@ PreprocessDropStatisticsStmt(Node *node, const char *queryString,
 		return NIL;
 	}
 
+	EnsureCoordinator();
+
 	QualifyTreeNode((Node *) dropStatisticsStmt);
 
 	List *ddlJobs = NIL;

@@ -147,6 +147,11 @@ PreprocessGrantOnSchemaStmt(Node *node, const char *queryString,
 		return NIL;
 	}
 
+	if (GetLocalGroupId() != COORDINATOR_GROUP_ID)
+	{
+		return NIL;
+	}
+
 	List *originalObjects = stmt->objects;
 
 	stmt->objects = distributedSchemas;
@@ -176,6 +181,8 @@ PreprocessAlterSchemaRenameStmt(Node *node, const char *queryString,
 	{
 		return NIL;
 	}
+
+	EnsureCoordinator();
 
 	/* fully qualify */
 	QualifyTreeNode(node);

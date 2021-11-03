@@ -213,6 +213,11 @@ PreprocessAlterRoleSetStmt(Node *node, const char *queryString,
 		return NIL;
 	}
 
+	if (GetLocalGroupId() != COORDINATOR_GROUP_ID)
+	{
+		return NIL;
+	}
+
 	QualifyTreeNode((Node *) stmt);
 	const char *sql = DeparseTreeNode((Node *) stmt);
 

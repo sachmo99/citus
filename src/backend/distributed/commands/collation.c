@@ -320,6 +320,8 @@ PreprocessRenameCollationStmt(Node *node, const char *queryString,
 		return NIL;
 	}
 
+	EnsureCoordinator();
+
 	/* fully qualify */
 	QualifyTreeNode((Node *) stmt);
 
@@ -584,6 +586,8 @@ PostprocessDefineCollationStmt(Node *node, const char *queryString)
 	{
 		return NIL;
 	}
+
+	EnsureCoordinator();
 
 	ObjectAddress collationAddress =
 		DefineCollationStmtObjectAddress(node, false);
