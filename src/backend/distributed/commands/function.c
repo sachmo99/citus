@@ -561,7 +561,7 @@ EnsureFunctionCanBeColocatedWithTable(Oid functionOid, Oid distributionColumnTyp
 /*
  * UpdateFunctionDistributionInfo gets object address of a function and
  * updates its distribution_argument_index and colocationId in pg_dist_object.
- * Then update pg_dist_object on nodes with metadata if ddl propagation is on.
+ * Then update pg_dist_object on nodes with metadata if object propagation is on.
  */
 void
 UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,

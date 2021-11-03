@@ -2026,7 +2026,7 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 								{
 									needMetadataSyncForNewSequences = true;
 									MarkSequenceDistributedAndPropagateDependencies(
-										seqOid);
+										relationId, seqOid);
 									alterTableDefaultNextvalCmd =
 										GetAddColumnWithNextvalDefaultCmd(seqOid,
 																		  relationId,
@@ -2066,7 +2066,8 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 						ClusterHasKnownMetadataWorkers())
 					{
 						needMetadataSyncForNewSequences = true;
-						MarkSequenceDistributedAndPropagateDependencies(seqOid);
+						MarkSequenceDistributedAndPropagateDependencies(relationId,
+																		seqOid);
 						alterTableDefaultNextvalCmd = GetAlterColumnWithNextvalDefaultCmd(
 							seqOid, relationId, command->name);
 					}
@@ -2077,21 +2078,8 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 
 	if (needMetadataSyncForNewSequences)
 	{
-		List *sequenceCommandList = NIL;
-
-		/* commands to create sequences */
-		List *sequenceDDLCommands = SequenceDDLCommandsForTable(relationId);
-		sequenceCommandList = list_concat(sequenceCommandList, sequenceDDLCommands);
-
 		/* prevent recursive propagation */
 		SendCommandToWorkersWithMetadata(DISABLE_DDL_PROPAGATION);
-
-		/* send the commands one by one */
-		const char *sequenceCommand = NULL;
-		foreach_ptr(sequenceCommand, sequenceCommandList)
-		{
-			SendCommandToWorkersWithMetadata(sequenceCommand);
-		}
 
 		/*
 		 * It's easy to retrieve the sequence id to create the proper commands

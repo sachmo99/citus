@@ -552,11 +552,8 @@ MetadataCreateCommands(void)
 		List *dependentSequenceList = NIL;
 		GetDependentSequencesWithRelation(relationId, &attnumList,
 										  &dependentSequenceList, 0);
-		MarkSequenceListDistributedAndPropagateDependencies(dependentSequenceList);
-
-		List *workerSequenceDDLCommands = SequenceDDLCommandsForTable(relationId);
-		metadataSnapshotCommandList = list_concat(metadataSnapshotCommandList,
-												  workerSequenceDDLCommands);
+		MarkSequenceListDistributedAndPropagateDependencies(relationId,
+															dependentSequenceList);
 
 		/* ddlCommandList contains TableDDLCommand information, need to materialize */
 		TableDDLCommand *tableDDLCommand = NULL;
@@ -711,10 +708,6 @@ GetDistributedTableDDLEvents(Oid relationId)
 	bool tableOwnedByExtension = IsTableOwnedByExtension(relationId);
 	if (!tableOwnedByExtension)
 	{
-		/* commands to create sequences */
-		List *sequenceDDLCommands = SequenceDDLCommandsForTable(relationId);
-		commandList = list_concat(commandList, sequenceDDLCommands);
-
 		/*
 		 * Commands to create the table, these commands are TableDDLCommands so lets
 		 * materialize to the non-sharded version

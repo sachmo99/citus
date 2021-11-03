@@ -144,7 +144,7 @@ ObjectExists(const ObjectAddress *address)
  * by adding appropriate entries to citus.pg_dist_object.
  *
  * This also marks the object as distributed on all of the workers with metadata
- * (unless localOnly is true).
+ * if object propagation is on.
  */
 void
 MarkObjectDistributed(const ObjectAddress *distAddress)

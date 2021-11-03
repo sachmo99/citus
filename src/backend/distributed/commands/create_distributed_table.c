@@ -127,6 +127,7 @@ static void DoCopyFromLocalTableIntoShards(Relation distributedRelation,
 										   TupleTableSlot *slot,
 										   EState *estate);
 static void ErrorIfTemporaryTable(Oid relationId);
+static void EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid);
 
 /* exports for SQL callable functions */
 PG_FUNCTION_INFO_V1(master_create_distributed_table);
@@ -539,7 +540,8 @@ CreateDistributedTable(Oid relationId, Var *distributionColumn, char distributio
 			 * Ensure sequence dependencies and mark them as distributed
 			 * before creating table metadata on workers
 			 */
-			MarkSequenceListDistributedAndPropagateDependencies(dependentSequenceList);
+			MarkSequenceListDistributedAndPropagateDependencies(relationId,
+																dependentSequenceList);
 		}
 
 		CreateTableMetadataOnWorkers(relationId);
@@ -670,34 +672,79 @@ AlterSequenceType(Oid seqOid, Oid typeOid)
 
 
 /*
- * MarkSequenceListDistributedAndPropagateDependencies ensures dependencies
- * for the given sequence list exist on all nodes and marks the sequences
+ * MarkSequenceListDistributedAndPropagateDependencies ensures sequences and their
+ * dependencies for the given sequence list exist on all nodes and marks the sequences
  * as distributed.
  */
 void
-MarkSequenceListDistributedAndPropagateDependencies(List *sequenceList)
+MarkSequenceListDistributedAndPropagateDependencies(Oid relationId, List *sequenceList)
 {
 	Oid sequenceOid = InvalidOid;
 	foreach_oid(sequenceOid, sequenceList)
 	{
-		MarkSequenceDistributedAndPropagateDependencies(sequenceOid);
+		MarkSequenceDistributedAndPropagateDependencies(relationId, sequenceOid);
 	}
 }
 
 
 /*
- * MarkSequenceDistributedAndPropagateDependencies ensures dependencies
- * for the given sequence exist on all nodes and marks the sequence
+ * MarkSequenceDistributedAndPropagateDependencies ensures sequence and its'
+ * dependencies for the given sequence exist on all nodes and marks the sequence
  * as distributed.
  */
 void
-MarkSequenceDistributedAndPropagateDependencies(Oid sequenceOid)
+MarkSequenceDistributedAndPropagateDependencies(Oid relationId, Oid sequenceOid)
 {
 	/* get sequence address */
 	ObjectAddress sequenceAddress = { 0 };
 	ObjectAddressSet(sequenceAddress, RelationRelationId, sequenceOid);
 	EnsureDependenciesExistOnAllNodes(&sequenceAddress);
+	EnsureSequenceExistForRelation(relationId, sequenceOid);
 	MarkObjectDistributed(&sequenceAddress);
+}
+
+
+/*
+ * EnsureSequenceExistForRelation ensures sequence for the given relation
+ * exist on each worker node.
+ */
+static void
+EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid)
+{
+	List *sequenceDDLList = NIL;
+	char *ownerName = TableOwner(relationId);
+	char *sequenceDef = pg_get_sequencedef_string(sequenceOid);
+	char *escapedSequenceDef = quote_literal_cstr(sequenceDef);
+	StringInfo wrappedSequenceDef = makeStringInfo();
+	StringInfo sequenceGrantStmt = makeStringInfo();
+	char *sequenceName = generate_qualified_relation_name(sequenceOid);
+	Form_pg_sequence sequenceData = pg_get_sequencedef(sequenceOid);
+	Oid sequenceTypeOid = sequenceData->seqtypid;
+	char *typeName = format_type_be(sequenceTypeOid);
+
+	/* create schema if needed */
+	appendStringInfo(wrappedSequenceDef,
+					 WORKER_APPLY_SEQUENCE_COMMAND,
+					 escapedSequenceDef,
+					 quote_literal_cstr(typeName));
+
+	appendStringInfo(sequenceGrantStmt,
+					 "ALTER SEQUENCE %s OWNER TO %s", sequenceName,
+					 quote_identifier(ownerName));
+
+	sequenceDDLList = lappend(sequenceDDLList, wrappedSequenceDef->data);
+	sequenceDDLList = lappend(sequenceDDLList, sequenceGrantStmt->data);
+
+	/* prevent recursive propagation */
+	SendCommandToWorkersWithMetadata(DISABLE_DDL_PROPAGATION);
+
+	const char *sequenceCommand = NULL;
+	foreach_ptr(sequenceCommand, sequenceDDLList)
+	{
+		SendCommandToWorkersWithMetadata(sequenceCommand);
+	}
+
+	SendCommandToWorkersWithMetadata(ENABLE_DDL_PROPAGATION);
 }
 
 
