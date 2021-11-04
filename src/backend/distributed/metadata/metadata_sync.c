@@ -717,10 +717,6 @@ GetDistributedTableDDLEvents(Oid relationId)
 	bool tableOwnedByExtension = IsTableOwnedByExtension(relationId);
 	if (!tableOwnedByExtension)
 	{
-		/* commands to create sequences */
-		List *sequenceDDLCommands = SequenceDDLCommandsForTable(relationId);
-		commandList = list_concat(commandList, sequenceDDLCommands);
-
 		/*
 		 * Commands to create the table, these commands are TableDDLCommands so lets
 		 * materialize to the non-sharded version
