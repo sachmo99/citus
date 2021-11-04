@@ -3,7 +3,19 @@ SET search_path TO "distributed planning";
 -- Confirm the basics work
 INSERT INTO test VALUES (1, 2), (3, 4), (5, 6), (2, 7), (4, 5);
 INSERT INTO test VALUES (6, 7);
+-- Insert two edge case values, the first value hashes to MAX_INT32 and the
+-- second hashes to MIN_INT32. This should not break anything, but these cases
+-- caused some crashes in the past.
+-- See c6c31e0f1fe5b8cc955b0da42264578dcdae16cc and
+-- 683279cc366069db9c2ccaca85dfaf8572113cda for details.
+--
+-- These specific values were found by using the following two queries:
+-- select q.i from (select generate_series(0, 10000000000000) i) q where hashint8(q.i) = 2147483647 limit 1;
+-- select q.i from (select generate_series(0, 10000000000000) i) q where hashint8(q.i) = -2147483648 limit 1;
+INSERT INTO test VALUES (2608474032, 2608474032), (963809240, 963809240);
 SELECT * FROM test WHERE x = 1 ORDER BY y, x;
+-- Confirm that hash values are as expected
+SELECT hashint8(x) FROM test ORDER BY 1;
 SELECT t1.x, t2.y FROM test t1 JOIN test t2 USING(x) WHERE t1.x = 1 AND t2.x = 1 ORDER BY t2.y, t1.x;
 SELECT * FROM test WHERE x = 1 OR x = 2 ORDER BY y, x;
 SELECT count(*) FROM test;
@@ -244,6 +256,47 @@ SELECT
 FROM
 	test
 WHERE x IN (SELECT num FROM cte_1);
+
+
+BEGIN;
+INSERT INTO ref VALUES (1, 1), (3, 3), (4, 4);
+INSERT INTO ref2 VALUES (1, 1), (2, 2), (3, 3), (5, 5);
+-- multiple CTEs working together
+-- this qeury was reported as a bug by a user
+WITH cte_ref AS (
+    SELECT a as abc from ref where a IN (1, 2)
+),
+cte_join1 AS (
+    SELECT
+       2 as result
+    FROM cte_ref
+    JOIN ref2 AS reff ON reff.b = cte_ref.abc
+),
+cte_join2 AS (
+    SELECT
+       1 as result
+    FROM cte_ref
+    LEFT JOIN test
+    ON test.x = cte_ref.abc
+    WHERE test.x IN (1, 2)
+      AND x > 0
+),
+cte_with_subq AS (
+    SELECT
+      (SELECT result FROM cte_join1 where result::int > 0) as result
+    FROM cte_join2
+    UNION ALL
+    SELECT
+      (SELECT result FROM cte_join1 where result::int < 10) as result
+    FROM cte_ref
+)
+
+SELECT * from cte_with_subq
+UNION ALL SELECT 3 FROM cte_join1
+UNION ALL SELECT 4 FROM cte_ref
+ORDER BY 1;
+
+ROLLBACK;
 
 -- query fails on the shards should be handled
 -- nicely
