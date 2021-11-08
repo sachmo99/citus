@@ -760,11 +760,11 @@ LockShardListResources(List *shardIntervalList, LOCKMODE lockMode)
 
 
 /*
- * LockRelationShardResources takes locks on all shards in a list of RelationShards
- * to prevent concurrent DML statements on those shards.
+ * SerializeNonCommutativeRelationShardResources takes locks on all shards in a
+ * list of RelationShards to prevent concurrent DML statements on those shards.
  */
 void
-LockRelationShardResources(List *relationShardList, LOCKMODE lockMode)
+SerializeNonCommutativeRelationShardResources(List *relationShardList, LOCKMODE lockMode)
 {
 	/* lock shards in a consistent order to prevent deadlock */
 	relationShardList = SortList(relationShardList, CompareRelationShards);
@@ -776,7 +776,7 @@ LockRelationShardResources(List *relationShardList, LOCKMODE lockMode)
 
 		if (shardId != INVALID_SHARD_ID)
 		{
-			LockShardResource(shardId, lockMode);
+			SerializeNonCommutativeWrites(shardId, lockMode);
 		}
 	}
 }

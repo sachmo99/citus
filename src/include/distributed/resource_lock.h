@@ -141,7 +141,8 @@ extern void LockShardsInPlacementListMetadata(List *shardPlacementList,
 extern void LockTransactionRecovery(LOCKMODE lockMode);
 
 extern void SerializeNonCommutativeWrites(List *shardIntervalList, LOCKMODE lockMode);
-extern void LockRelationShardResources(List *relationShardList, LOCKMODE lockMode);
+extern void SerializeNonCommutativeRelationShardResources(List *relationShardList,
+														  LOCKMODE lockMode);
 extern List * GetSortedReferenceShardIntervals(List *relationList);
 
 /* Lock parent table's colocated shard resource */

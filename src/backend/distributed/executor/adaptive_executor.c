@@ -1749,7 +1749,8 @@ AcquireExecutorShardLocksForExecution(DistributedExecution *execution)
 			 * concurrently.
 			 */
 
-			LockRelationShardResources(task->relationShardList, ExclusiveLock);
+			SerializeNonCommutativeRelationShardResources(task->relationShardList,
+														  ExclusiveLock);
 		}
 	}
 }
