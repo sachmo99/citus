@@ -2,9 +2,7 @@ setup
 {
 	SELECT citus_internal.replace_isolation_tester_func();
 	SELECT citus_internal.refresh_isolation_tester_prepared_statement();
-	
 	SET citus.shard_replication_factor to 2;
-
 	CREATE TABLE users_test_table(user_id int, value_1 int, value_2 int, value_3 int);
 	SELECT create_distributed_table('users_test_table', 'user_id');
 	INSERT INTO users_test_table VALUES
