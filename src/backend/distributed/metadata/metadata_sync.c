@@ -981,12 +981,11 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 		colocationId = &colocationIdValue;
 	}
 
-	/*if (!ShouldSkipMetadataChecks()) */
-	/*{ */
-
-	/* this UDF is not allowed for executing as a separate command */
-	/*	EnsureCoordinatorInitiatedOperation(); */
-	/*} */
+	if (!ShouldSkipMetadataChecks())
+	{
+		/* this UDF is not allowed for executing as a separate command */
+		EnsureCoordinatorInitiatedOperation();
+	}
 
 	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray, argsArray,
 													 true);
