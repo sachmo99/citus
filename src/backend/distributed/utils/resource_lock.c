@@ -788,19 +788,29 @@ LockRelationShardResources(List *relationShardList, LOCKMODE lockMode)
  * shard resource lock on the colocated shard of the parent table.
  */
 void
-LockParentShardResourceIfPartition(uint64 shardId, LOCKMODE lockMode)
+LockParentShardResourceIfPartition(List *shardIntervalList, LOCKMODE lockMode)
 {
-	ShardInterval *shardInterval = LoadShardInterval(shardId);
-	Oid relationId = shardInterval->relationId;
+	List *parentShardIntervalList = NIL;
 
-	if (PartitionTable(relationId))
+	ShardInterval *shardInterval = NULL;
+	foreach_ptr(shardInterval, shardIntervalList)
 	{
-		int shardIndex = ShardIndex(shardInterval);
-		Oid parentRelationId = PartitionParentOid(relationId);
-		uint64 parentShardId = ColocatedShardIdInRelation(parentRelationId, shardIndex);
+		Oid relationId = shardInterval->relationId;
 
-		LockShardResource(parentShardId, lockMode);
+		if (PartitionTable(relationId))
+		{
+			int shardIndex = ShardIndex(shardInterval);
+			Oid parentRelationId = PartitionParentOid(relationId);
+			uint64 parentShardId = ColocatedShardIdInRelation(parentRelationId,
+															  shardIndex);
+
+			ShardInterval *parentShardInterval = LoadShardInterval(parentShardId);
+			parentShardIntervalList = lappend(parentShardIntervalList,
+											  parentShardInterval);
+		}
 	}
+
+	LockShardListResources(parentShardIntervalList, lockMode);
 }
 
 

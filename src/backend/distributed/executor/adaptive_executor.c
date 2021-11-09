@@ -1722,19 +1722,18 @@ AcquireExecutorShardLocksForExecution(DistributedExecution *execution)
 
 	/* now, iterate on the tasks and acquire the executor locks on the shards */
 	Task *task = NULL;
+	List *anchorShardIntervalList = NIL;
+	List *relationRowLockList = NIL;
+	List *requiresConsistentSnapshotRelationShardList = NIL;
+
 	foreach_ptr(task, taskList)
 	{
-		/*
-		 * If we are dealing with a partition we are also taking locks on parent table
-		 * to prevent deadlocks on concurrent operations on a partition and its parent.
-		 */
-		LockParentShardResourceIfPartition(task->anchorShardId, lockMode);
-
 		ShardInterval *anchorShardInterval = LoadShardInterval(task->anchorShardId);
-		SerializeNonCommutativeWrites(list_make1(anchorShardInterval), lockMode);
+		anchorShardIntervalList = lappend(anchorShardIntervalList, anchorShardInterval);
 
 		/* Acquire additional locks for SELECT .. FOR UPDATE on reference tables */
 		AcquireExecutorShardLocksForRelationRowLockList(task->relationRowLockList);
+		relationRowLockList = list_concat(relationRowLockList, task->relationRowLockList);
 
 		/*
 		 * If the task has a subselect, then we may need to lock the shards from which
@@ -1749,9 +1748,35 @@ AcquireExecutorShardLocksForExecution(DistributedExecution *execution)
 			 * concurrently.
 			 */
 
-			LockRelationShardResources(task->relationShardList, ExclusiveLock);
+			requiresConsistentSnapshotRelationShardList =
+				list_concat(requiresConsistentSnapshotRelationShardList,
+							task->relationShardList);
 		}
 	}
+
+
+	/*
+	 * If we are dealing with a partition we are also taking locks on parent table
+	 * to prevent deadlocks on concurrent operations on a partition and its parent.
+	 */
+	LockParentShardResourceIfPartition(anchorShardIntervalList, lockMode);
+
+	SerializeNonCommutativeWrites(anchorShardIntervalList, lockMode);
+
+	/* Acquire additional locks for SELECT .. FOR UPDATE on reference tables */
+	AcquireExecutorShardLocksForRelationRowLockList(relationRowLockList);
+
+	/*
+	 * If the task has a subselect, then we may need to lock the shards from which
+	 * the query selects as well to prevent the subselects from seeing different
+	 * results on different replicas.
+	 *
+	 * ExclusiveLock conflicts with all lock types used by modifications
+	 * and therefore prevents other modifications from running
+	 * concurrently.
+	 */
+	LockRelationShardResources(requiresConsistentSnapshotRelationShardList,
+							   ExclusiveLock);
 }
 
 
