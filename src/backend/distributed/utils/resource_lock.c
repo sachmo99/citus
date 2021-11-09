@@ -717,6 +717,11 @@ LockShardsInPlacementListMetadata(List *shardPlacementList, LOCKMODE lockMode)
 void
 SerializeNonCommutativeWrites(List *shardIntervalList, LOCKMODE lockMode)
 {
+	if (shardIntervalList == NIL)
+	{
+		return;
+	}
+
 	ShardInterval *firstShardInterval = (ShardInterval *) linitial(shardIntervalList);
 	int64 firstShardId = firstShardInterval->shardId;
 	Oid relationId = firstShardInterval->relationId;
@@ -766,6 +771,11 @@ LockShardListResources(List *shardIntervalList, LOCKMODE lockMode)
 void
 LockRelationShardResources(List *relationShardList, LOCKMODE lockMode)
 {
+	if (relationShardList == NIL)
+	{
+		return;
+	}
+
 	/* lock shards in a consistent order to prevent deadlock */
 	relationShardList = SortList(relationShardList, CompareRelationShards);
 
