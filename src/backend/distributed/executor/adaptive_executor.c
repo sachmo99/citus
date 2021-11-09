@@ -1721,11 +1721,11 @@ AcquireExecutorShardLocksForExecution(DistributedExecution *execution)
 	}
 
 	/* now, iterate on the tasks and acquire the executor locks on the shards */
-	Task *task = NULL;
 	List *anchorShardIntervalList = NIL;
 	List *relationRowLockList = NIL;
 	List *requiresConsistentSnapshotRelationShardList = NIL;
 
+	Task *task = NULL;
 	foreach_ptr(task, taskList)
 	{
 		ShardInterval *anchorShardInterval = LoadShardInterval(task->anchorShardId);
@@ -1775,8 +1775,8 @@ AcquireExecutorShardLocksForExecution(DistributedExecution *execution)
 	 * and therefore prevents other modifications from running
 	 * concurrently.
 	 */
-	LockRelationShardResources(requiresConsistentSnapshotRelationShardList,
-							   ExclusiveLock);
+	//LockRelationShardResources(requiresConsistentSnapshotRelationShardList,
+	//						   ExclusiveLock);
 }
 
 
