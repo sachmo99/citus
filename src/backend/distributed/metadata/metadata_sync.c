@@ -989,7 +989,7 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	/*} */
 
 	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray, argsArray,
-													 false);
+													 true);
 
 	/* First, disable propagation off to not to cause infinite propagation */
 	EnableDependencyCreation = false;
@@ -1931,6 +1931,10 @@ DetachPartitionCommandList(void)
  * SyncMetadataToNodes tries recreating the metadata snapshot in the
  * metadata workers that are out of sync. Returns the result of
  * synchronization.
+ *
+ * This function must be called within coordinated transaction
+ * since updates on the pg_dist_node metadata must be rollbacked if anything
+ * goes wrong.
  */
 static MetadataSyncResult
 SyncMetadataToNodes(void)
@@ -1942,6 +1946,8 @@ SyncMetadataToNodes(void)
 		return METADATA_SYNC_SUCCESS;
 	}
 
+	Assert(InCoordinatedTransaction());
+
 	/*
 	 * Request a RowExclusiveLock so we don't run concurrently with other
 	 * functions updating pg_dist_node, but allow concurrency with functions
@@ -1952,41 +1958,46 @@ SyncMetadataToNodes(void)
 		return METADATA_SYNC_FAILED_LOCK;
 	}
 
-	List *syncedWorkerList = NIL;
 	List *workerList = ActivePrimaryNonCoordinatorNodeList(NoLock);
 	WorkerNode *workerNode = NULL;
 	foreach_ptr(workerNode, workerList)
 	{
 		if (workerNode->hasMetadata && !workerNode->metadataSynced)
 		{
+			/*
+			 * We need to have metadatasynced as true within SyncMetadataSnapshotTable.
+			 *
+			 * We can safely do that because we are in a coordinated transaction and the changes
+			 * are only visible to our own transaction.
+			 * If anything goes wrong, we are going to rollback all the changes.
+			 */
+			workerNode = SetWorkerColumn(workerNode, Anum_pg_dist_node_metadatasynced,
+										 BoolGetDatum(true));
+
 			bool raiseInterrupts = false;
 			if (!SyncMetadataSnapshotToNode(workerNode, raiseInterrupts))
 			{
 				ereport(WARNING, (errmsg("failed to sync metadata to %s:%d",
 										 workerNode->workerName,
 										 workerNode->workerPort)));
+
+				/* Set metadatasynced back to false, if metadata couldn't be synced to node */
+				workerNode = SetWorkerColumn(workerNode, Anum_pg_dist_node_metadatasynced,
+											 BoolGetDatum(false));
+
 				result = METADATA_SYNC_FAILED_SYNC;
 			}
 			else
 			{
-				/* we add successfully synced nodes to set metadatasynced column later */
-				syncedWorkerList = lappend(syncedWorkerList, workerNode);
+				/* we fetch the same node again to check if it's synced or not */
+				WorkerNode *nodeUpdated = FindWorkerNode(workerNode->workerName,
+														 workerNode->workerPort);
+				if (!nodeUpdated->metadataSynced)
+				{
+					/* set the result to FAILED to trigger the sync again */
+					result = METADATA_SYNC_FAILED_SYNC;
+				}
 			}
-		}
-	}
-
-	foreach_ptr(workerNode, syncedWorkerList)
-	{
-		SetWorkerColumnOptional(workerNode, Anum_pg_dist_node_metadatasynced,
-								BoolGetDatum(true));
-
-		/* we fetch the same node again to check if it's synced or not */
-		WorkerNode *nodeUpdated = FindWorkerNode(workerNode->workerName,
-												 workerNode->workerPort);
-		if (!nodeUpdated->metadataSynced)
-		{
-			/* set the result to FAILED to trigger the sync again */
-			result = METADATA_SYNC_FAILED_SYNC;
 		}
 	}
 
