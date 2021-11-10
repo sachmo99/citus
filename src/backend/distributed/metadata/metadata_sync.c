@@ -1970,8 +1970,7 @@ SyncMetadataToNodes(void)
 			 * are only visible to our own transaction.
 			 * If anything goes wrong, we are going to rollback all the changes.
 			 */
-			workerNode = SetWorkerColumn(workerNode, Anum_pg_dist_node_metadatasynced,
-										 BoolGetDatum(true));
+			workerNode = SetWorkerColumnOptional(workerNode, Anum_pg_dist_node_metadatasynced, BoolGetDatum(true));
 
 			bool raiseInterrupts = false;
 			if (!SyncMetadataSnapshotToNode(workerNode, raiseInterrupts))
@@ -1981,7 +1980,7 @@ SyncMetadataToNodes(void)
 										 workerNode->workerPort)));
 
 				/* Set metadatasynced back to false, if metadata couldn't be synced to node */
-				workerNode = SetWorkerColumn(workerNode, Anum_pg_dist_node_metadatasynced,
+				workerNode = SetWorkerColumnOptional(workerNode, Anum_pg_dist_node_metadatasynced,
 											 BoolGetDatum(false));
 
 				result = METADATA_SYNC_FAILED_SYNC;
