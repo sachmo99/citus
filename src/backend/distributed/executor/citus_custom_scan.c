@@ -194,8 +194,8 @@ CitusBeginScan(CustomScanState *node, EState *estate, int eflags)
 	}
 
 	Job *workerJob = scanState->distributedPlan->workerJob;
-	Const *distArgument = GetInForceDelegatedFuncExecution();
-	if (distArgument && !equal(distArgument, workerJob->partitionKeyValue))
+
+	if (!IsShardKeyValueAllowed(workerJob->partitionKeyValue))
 	{
 		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						errmsg("queries must filter by distribution argument "

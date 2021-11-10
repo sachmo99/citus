@@ -5548,7 +5548,7 @@ static void
 EnsureDelegatedFunctionSafeExecution(List *taskList)
 {
 	/* If no forcePushdown function execution, nothing to check */
-	if (!GetInForceDelegatedFuncExecution())
+	if (GetInForceDelegatedFuncExecution() == NIL)
 	{
 		return;
 	}

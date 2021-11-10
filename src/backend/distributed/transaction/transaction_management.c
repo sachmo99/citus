@@ -103,9 +103,9 @@ MemoryContext CommitContext = NULL;
 bool ShouldCoordinatedTransactionUse2PC = false;
 
 /*
- * Distribution function argument when delgated using forcePushdown flag.
+ * Distribution function arguments when delgated using forcePushdown flag.
  */
-Const *AllowedDistributionColumnValue = NULL;
+List *AllowedDistributionColumnValues = NIL;
 
 /* if disabled, distributed statements in a function may run as separate transactions */
 bool FunctionOpensTransactionBlock = true;
@@ -198,21 +198,44 @@ InCoordinatedTransaction(void)
 void
 EnableInForceDelegatedFuncExecution(Const *distArgument)
 {
-	AllowedDistributionColumnValue = distArgument;
+	AllowedDistributionColumnValues = lappend(AllowedDistributionColumnValues,
+											  distArgument);
 }
 
 
 /*
  * Returns the forcePushdown function distribution argument (if any).
  */
-Const *
+List *
 GetInForceDelegatedFuncExecution()
 {
 	/*
-	 * This value is overloaded, a NULL indicates as false i.e. we are
+	 * This value is overloaded, a NIL indicates as false i.e. we are
 	 * not in a forcePushdown delegated function execution.
 	 */
-	return AllowedDistributionColumnValue;
+	return AllowedDistributionColumnValues;
+}
+
+
+bool
+IsShardKeyValueAllowed(Const *value)
+{
+	if (AllowedDistributionColumnValues == NIL)
+	{
+		/* there are no force-pushdown function or unsafe trigger values */
+		return true;
+	}
+
+	Const *distArgument = NULL;
+	foreach_ptr(distArgument, AllowedDistributionColumnValues)
+	{
+		if (equal(distArgument, value))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 
@@ -490,7 +513,7 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 		case XACT_EVENT_PARALLEL_PRE_COMMIT:
 		case XACT_EVENT_PRE_PREPARE:
 		{
-			if (InCoordinatedTransaction() && !GetInForceDelegatedFuncExecution())
+			if (InCoordinatedTransaction() && (GetInForceDelegatedFuncExecution() == NIL))
 			{
 				ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								errmsg("cannot use 2PC in transactions involving "
@@ -582,7 +605,7 @@ ResetGlobalVariables()
 	TransactionModifiedNodeMetadata = false;
 	MetadataSyncOnCommit = false;
 	ResetWorkerErrorIndication();
-	AllowedDistributionColumnValue = NULL;
+	AllowedDistributionColumnValues = NIL;
 }
 
 

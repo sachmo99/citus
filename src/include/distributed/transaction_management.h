@@ -109,10 +109,9 @@ extern bool GetCoordinatedTransactionShouldUse2PC(void);
 extern bool IsMultiStatementTransaction(void);
 extern void EnsureDistributedTransactionId(void);
 extern void EnableInForceDelegatedFuncExecution(Const *distArgument);
-extern Const * GetInForceDelegatedFuncExecution(void);
-#if DELETE
-extern bool IsForcePushdown(void);
-#endif
+extern List * GetInForceDelegatedFuncExecution(void);
+extern bool IsShardKeyValueAllowed(Const *value);
+
 
 /* initialization function(s) */
 extern void InitializeTransactionManagement(void);
