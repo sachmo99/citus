@@ -543,6 +543,10 @@ MetadataCreateCommands(void)
 		 * and committed immediately so they become visible to all sessions creating shards.
 		 */
 		ObjectAddressSet(tableAddress, RelationRelationId, relationId);
+
+		bool prevDependencyCreationValue = EnableDependencyCreation;
+		EnableDependencyCreation = false;
+
 		EnsureDependenciesExistOnAllNodes(&tableAddress);
 
 		/*
@@ -552,8 +556,16 @@ MetadataCreateCommands(void)
 		List *dependentSequenceList = NIL;
 		GetDependentSequencesWithRelation(relationId, &attnumList,
 										  &dependentSequenceList, 0);
-		MarkSequenceListDistributedAndPropagateDependencies(relationId,
-															dependentSequenceList);
+
+		Oid sequenceOid = InvalidOid;
+		foreach_oid(sequenceOid, dependentSequenceList)
+		{
+			ObjectAddress sequenceAddress = { 0 };
+			ObjectAddressSet(sequenceAddress, RelationRelationId, sequenceOid);
+			EnsureDependenciesExistOnAllNodes(&sequenceAddress);
+		}
+
+		EnableDependencyCreation = prevDependencyCreationValue;
 
 		/*
 		 * We need to get sequence DDL commands again as the sequences created
@@ -984,7 +996,7 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	if (!ShouldSkipMetadataChecks())
 	{
 		/* this UDF is not allowed for executing as a separate command */
-		// EnsureCoordinatorInitiatedOperation();
+		/* EnsureCoordinatorInitiatedOperation(); */
 	}
 
 	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray, argsArray,
@@ -1939,13 +1951,10 @@ static MetadataSyncResult
 SyncMetadataToNodes(void)
 {
 	MetadataSyncResult result = METADATA_SYNC_SUCCESS;
-
 	if (!IsCoordinator())
 	{
 		return METADATA_SYNC_SUCCESS;
 	}
-
-	Assert(InCoordinatedTransaction());
 
 	/*
 	 * Request a RowExclusiveLock so we don't run concurrently with other
@@ -1957,45 +1966,41 @@ SyncMetadataToNodes(void)
 		return METADATA_SYNC_FAILED_LOCK;
 	}
 
+	List *syncedWorkerList = NIL;
 	List *workerList = ActivePrimaryNonCoordinatorNodeList(NoLock);
 	WorkerNode *workerNode = NULL;
 	foreach_ptr(workerNode, workerList)
 	{
 		if (workerNode->hasMetadata && !workerNode->metadataSynced)
 		{
-			/*
-			 * We need to have metadatasynced as true within SyncMetadataSnapshotTable.
-			 *
-			 * We can safely do that because we are in a coordinated transaction and the changes
-			 * are only visible to our own transaction.
-			 * If anything goes wrong, we are going to rollback all the changes.
-			 */
-			workerNode = SetWorkerColumnOptional(workerNode, Anum_pg_dist_node_metadatasynced, BoolGetDatum(true));
-
 			bool raiseInterrupts = false;
 			if (!SyncMetadataSnapshotToNode(workerNode, raiseInterrupts))
 			{
 				ereport(WARNING, (errmsg("failed to sync metadata to %s:%d",
 										 workerNode->workerName,
 										 workerNode->workerPort)));
-
-				/* Set metadatasynced back to false, if metadata couldn't be synced to node */
-				workerNode = SetWorkerColumnOptional(workerNode, Anum_pg_dist_node_metadatasynced,
-											 BoolGetDatum(false));
-
 				result = METADATA_SYNC_FAILED_SYNC;
 			}
 			else
 			{
-				/* we fetch the same node again to check if it's synced or not */
-				WorkerNode *nodeUpdated = FindWorkerNode(workerNode->workerName,
-														 workerNode->workerPort);
-				if (!nodeUpdated->metadataSynced)
-				{
-					/* set the result to FAILED to trigger the sync again */
-					result = METADATA_SYNC_FAILED_SYNC;
-				}
+				/* we add successfully synced nodes to set metadatasynced column later */
+				syncedWorkerList = lappend(syncedWorkerList, workerNode);
 			}
+		}
+	}
+
+	foreach_ptr(workerNode, syncedWorkerList)
+	{
+		SetWorkerColumnOptional(workerNode, Anum_pg_dist_node_metadatasynced,
+								BoolGetDatum(true));
+
+		/* we fetch the same node again to check if it's synced or not */
+		WorkerNode *nodeUpdated = FindWorkerNode(workerNode->workerName,
+												 workerNode->workerPort);
+		if (!nodeUpdated->metadataSynced)
+		{
+			/* set the result to FAILED to trigger the sync again */
+			result = METADATA_SYNC_FAILED_SYNC;
 		}
 	}
 
@@ -2048,8 +2053,8 @@ SyncMetadataToNodesMain(Datum main_arg)
 		else if (CheckCitusVersion(DEBUG1) && CitusHasBeenLoaded())
 		{
 			UseCoordinatedTransaction();
-			MetadataSyncResult result = SyncMetadataToNodes();
 
+			MetadataSyncResult result = SyncMetadataToNodes();
 			syncedAllNodes = (result == METADATA_SYNC_SUCCESS);
 
 			/* we use LISTEN/NOTIFY to wait for metadata syncing in tests */
