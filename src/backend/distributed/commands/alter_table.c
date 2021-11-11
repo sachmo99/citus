@@ -1398,8 +1398,8 @@ ReplaceTable(Oid sourceId, Oid targetId, List *justBeforeDropCommands,
 	}
 
 	resetStringInfo(query);
-	appendStringInfo(query, "DROP%s TABLE %s CASCADE",
-					 IsForeignTable(sourceId) ? " FOREIGN": "",
+	appendStringInfo(query, "DROP %sTABLE %s CASCADE",
+					 IsForeignTable(sourceId) ? "FOREIGN " : "",
 					 quote_qualified_identifier(schemaName, sourceName));
 	ExecuteQueryViaSPI(query->data, SPI_OK_UTILITY);
 

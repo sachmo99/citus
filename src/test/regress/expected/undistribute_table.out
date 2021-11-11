@@ -143,7 +143,15 @@ NOTICE:  foreign-data wrapper "fake_fdw" does not have an extension defined
 (1 row)
 
 SELECT undistribute_table('foreign_table');
-ERROR:  cannot complete operation because it is a foreign table
+NOTICE:  foreign-data wrapper "fake_fdw" does not have an extension defined
+NOTICE:  creating a new table for undistribute_table.foreign_table
+NOTICE:  dropping the old undistribute_table.foreign_table
+NOTICE:  renaming the new table to undistribute_table.foreign_table
+ undistribute_table
+---------------------------------------------------------------------
+
+(1 row)
+
 DROP FOREIGN TABLE foreign_table;
 -- test partitioned tables
 CREATE TABLE partitioned_table (id INT, a INT) PARTITION BY RANGE (id);
