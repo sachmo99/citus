@@ -587,10 +587,13 @@ PostprocessDefineCollationStmt(Node *node, const char *queryString)
 		return NIL;
 	}
 
-	EnsureCoordinator();
-
 	ObjectAddress collationAddress =
 		DefineCollationStmtObjectAddress(node, false);
+
+	if (IsObjectDistributed(&collationAddress))
+	{
+		EnsureCoordinator();
+	}
 
 	EnsureDependenciesExistOnAllNodes(&collationAddress);
 

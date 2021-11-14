@@ -382,8 +382,6 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool acc
 				aclMaskResult = pg_namespace_aclmask(idToCheck, userId, ACL_USAGE |
 													 ACL_CONNECT | ACL_INSERT |
 													 ACL_SELECT, ACLMASK_ANY);
-				elog(WARNING,
-					 "Schema mask result is %d", aclMaskResult);
 				break;
 			}
 
