@@ -829,12 +829,22 @@ GRANT EXECUTE ON FUNCTION start_metadata_sync_to_node(text,int) TO non_super_met
 GRANT EXECUTE ON FUNCTION stop_metadata_sync_to_node(text,int,bool) TO non_super_metadata_user;
 GRANT ALL ON pg_dist_node TO non_super_metadata_user;
 GRANT ALL ON pg_dist_local_group TO non_super_metadata_user;
+GRANT ALL ON SCHEMA citus TO non_super_metadata_user;
+GRANT ALL ON SCHEMA mx_testing_schema TO non_super_metadata_user;
+GRANT ALL ON SCHEMA mx_testing_schema_2 TO non_super_metadata_user;
 SELECT run_command_on_workers('GRANT ALL ON pg_dist_node TO non_super_metadata_user');
 SELECT run_command_on_workers('GRANT ALL ON pg_dist_local_group TO non_super_metadata_user');
 SELECT run_command_on_workers('GRANT ALL ON ALL TABLES IN SCHEMA citus TO non_super_metadata_user');
 SELECT run_command_on_workers('GRANT ALL ON SCHEMA citus TO non_super_metadata_user');
+SELECT run_command_on_workers('GRANT ALL ON ALL TABLES IN SCHEMA mx_testing_schema TO non_super_metadata_user');
+SELECT run_command_on_workers('GRANT ALL ON SCHEMA mx_testing_schema TO non_super_metadata_user');
+SELECT run_command_on_workers('GRANT ALL ON ALL TABLES IN SCHEMA mx_testing_schema_2 TO non_super_metadata_user');
+SELECT run_command_on_workers('GRANT ALL ON SCHEMA mx_testing_schema_2 TO non_super_metadata_user');
 
 SET ROLE non_super_metadata_user;
+
+select run_command_on_workers($$select oid || nspname || nspacl::text from pg_namespace where nspname = 'citus'$$);
+SELECT * FROM pg_namespace;
 
 SELECT stop_metadata_sync_to_node('localhost', :worker_1_port);
 SELECT start_metadata_sync_to_node('localhost', :worker_1_port);

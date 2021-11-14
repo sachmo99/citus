@@ -2053,7 +2053,7 @@ SyncMetadataToNodesMain(Datum main_arg)
 		else if (CheckCitusVersion(DEBUG1) && CitusHasBeenLoaded())
 		{
 			UseCoordinatedTransaction();
-
+			
 			MetadataSyncResult result = SyncMetadataToNodes();
 			syncedAllNodes = (result == METADATA_SYNC_SUCCESS);
 

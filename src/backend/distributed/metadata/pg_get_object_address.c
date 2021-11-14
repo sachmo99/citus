@@ -23,8 +23,6 @@
 #include "parser/parse_type.h"
 
 static List * textarray_to_strvaluelist(ArrayType *arr);
-static AclMode pg_aclmask(ObjectType objtype, Oid table_oid, Oid roleid, AclMode mask,
-						  AclMaskHow how);
 
 /* It is defined on PG >= 13 versions by default */
 #if PG_VERSION_NUM < PG_VERSION_13
@@ -360,28 +358,98 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool acc
 
 	if (accessCheck)
 	{
+		Oid userId = GetUserId();
+		AclMode aclMaskResult = 0;
 		Oid idToCheck = InvalidOid;
-		AclMode maskToCheck = ACL_SELECT | ACL_USAGE;
 
 		switch (type)
 		{
+			case OBJECT_ACCESS_METHOD:
+			{
+				if (IsObjectAddressOwnedByExtension(&addr, NULL))
+				{
+					elog(ERROR,
+						 "Current user does not have required access privileges on access method %d with type %d",
+						 addr.objectId, type);
+				}
+				aclMaskResult = 1;
+				break;
+			}
+
+			case OBJECT_SCHEMA:
+			{
+				idToCheck = addr.objectId;
+				aclMaskResult = pg_namespace_aclmask(idToCheck, userId, ACL_USAGE |
+													 ACL_CONNECT | ACL_INSERT |
+													 ACL_SELECT, ACLMASK_ANY);
+				elog(WARNING,
+					 "Schema mask result is %d", aclMaskResult);
+				break;
+			}
+
+			case OBJECT_FUNCTION:
+			case OBJECT_PROCEDURE:
+			case OBJECT_AGGREGATE:
+			{
+				idToCheck = addr.objectId;
+				aclMaskResult = pg_proc_aclmask(idToCheck, userId, ACL_EXECUTE,
+												ACLMASK_ANY);
+				break;
+			}
+
+			case OBJECT_DATABASE:
+			{
+				idToCheck = addr.objectId;
+				aclMaskResult = pg_database_aclmask(idToCheck, userId, ACL_CONNECT,
+													ACLMASK_ANY);
+				break;
+			}
+
+			case OBJECT_ROLE:
+			{
+				if (!(addr.objectId == CitusExtensionOwner()))
+				{
+					elog(ERROR,
+						 "Current user does not have required access privileges on role %d with type %d",
+						 addr.objectId, type);
+				}
+				aclMaskResult = 1;
+				break;
+			}
+
+			case OBJECT_TYPE:
+			{
+				idToCheck = addr.objectId;
+				aclMaskResult = pg_type_aclmask(idToCheck, userId, ACL_USAGE,
+												ACLMASK_ANY);
+				break;
+			}
+
 			case OBJECT_SEQUENCE:
 			case OBJECT_TABLE:
 			{
 				idToCheck = RelationGetRelid(relation);
+				aclMaskResult = pg_class_aclmask(idToCheck, userId, ACL_SELECT,
+												 ACLMASK_ANY);
+				break;
+			}
+
+			case OBJECT_COLLATION:
+			case OBJECT_EXTENSION:
+			{
+				aclMaskResult = 1;
 				break;
 			}
 
 			default:
 			{
-				idToCheck = addr.objectId;
+				elog(ERROR, "%d object type is not supported within object propagation",
+					 type);
 				break;
 			}
 		}
 
-		AclMode result = pg_aclmask(type, idToCheck, GetUserId(), maskToCheck,
-									ACLMASK_ANY);
-		if (result == ACL_NO_RIGHTS)
+		if (aclMaskResult == ACL_NO_RIGHTS)
 		{
 			elog(ERROR,
 				 "Current user does not have required access privileges on %d with type id %d",
@@ -401,104 +469,6 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool acc
 	return addr;
 
 	/* CITUS CODE END */
-}
-
-
-static AclMode
-pg_aclmask(ObjectType objtype, Oid table_oid, Oid roleid, AclMode mask, AclMaskHow how)
-{
-	switch (objtype)
-	{
-		case OBJECT_TABLE:
-		case OBJECT_SEQUENCE:
-		{
-			return pg_class_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_DATABASE:
-		{
-			return pg_database_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_FUNCTION:
-		{
-			return pg_proc_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_LANGUAGE:
-		{
-			return pg_language_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_LARGEOBJECT:
-		{
-			return pg_largeobject_aclmask_snapshot(table_oid, roleid,
-												   mask, how, NULL);
-		}
-
-		case OBJECT_SCHEMA:
-		{
-			return pg_namespace_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_STATISTIC_EXT:
-		{
-			elog(ERROR, "grantable rights not supported for statistics objects");
-
-			/* not reached, but keep compiler quiet */
-			return ACL_NO_RIGHTS;
-		}
-
-		case OBJECT_TABLESPACE:
-		{
-			return pg_tablespace_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_FDW:
-		{
-			return pg_foreign_data_wrapper_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_FOREIGN_SERVER:
-		{
-			return pg_foreign_server_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_EVENT_TRIGGER:
-		{
-			elog(ERROR, "grantable rights not supported for event triggers");
-
-			/* not reached, but keep compiler quiet */
-			return ACL_NO_RIGHTS;
-		}
-
-		case OBJECT_TYPE:
-		{
-			return pg_type_aclmask(table_oid, roleid, mask, how);
-		}
-
-		case OBJECT_ROLE:
-		{
-			return mask;
-		}
-
-		case OBJECT_EXTENSION:
-		{
-			return mask;
-		}
-
-		case OBJECT_COLLATION:
-		{
-			return mask;
-		}
-
-		default:
-			elog(ERROR, "unrecognized objtype: %d",
-				 (int) objtype);
-
-			/* not reached, but keep compiler quiet */
-			return ACL_NO_RIGHTS;
-	}
 }
 
 
