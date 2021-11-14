@@ -1000,7 +1000,7 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	}
 
 	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray, argsArray,
-													 false);
+													 true);
 
 	/* First, disable propagation off to not to cause infinite propagation */
 	EnableDependencyCreation = false;

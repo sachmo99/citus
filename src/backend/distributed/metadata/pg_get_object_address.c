@@ -23,6 +23,8 @@
 #include "parser/parse_type.h"
 
 static List * textarray_to_strvaluelist(ArrayType *arr);
+static AclMode pg_aclmask(ObjectType objtype, Oid table_oid, Oid roleid, AclMode mask,
+						  AclMaskHow how);
 
 /* It is defined on PG >= 13 versions by default */
 #if PG_VERSION_NUM < PG_VERSION_13
@@ -30,14 +32,14 @@ static List * textarray_to_strvaluelist(ArrayType *arr);
 #endif
 
 /*
- * Get the object address. If checkOwner is true, owner of the object is checked
- * and if it is not the current user function will error out.
+ * Get the object address. If accessCheck is true, access of the user on the object
+ * is checked and if it is not the current user function will error out.
  *
  * This function is mostly copied from pg_get_object_address of the PG code. We need
  * to copy that function to use intermediate data types to check ownership.
  */
 ObjectAddress
-PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool checkOwner)
+PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool accessCheck)
 {
 	List *name = NIL;
 	TypeName *typename = NULL;
@@ -355,9 +357,36 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 											&relation, AccessShareLock, false);
 
 	/* CITUS CODE BEGIN */
-	if (checkOwner)
+
+	if (accessCheck)
 	{
-		check_object_ownership(GetUserId(), type, addr, objnode, relation);
+		Oid idToCheck = InvalidOid;
+		AclMode maskToCheck = ACL_SELECT | ACL_USAGE;
+
+		switch (type)
+		{
+			case OBJECT_SEQUENCE:
+			case OBJECT_TABLE:
+			{
+				idToCheck = RelationGetRelid(relation);
+				break;
+			}
+
+			default:
+			{
+				idToCheck = addr.objectId;
+				break;
+			}
+		}
+
+		AclMode result = pg_aclmask(type, idToCheck, GetUserId(), maskToCheck,
+									ACLMASK_ANY);
+		if (result == ACL_NO_RIGHTS)
+		{
+			elog(ERROR,
+				 "Current user does not have required access privileges on %d with type id %d",
+				 idToCheck, type);
+		}
 	}
 
 	/* CITUS CODE END */
@@ -372,6 +401,104 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool che
 	return addr;
 
 	/* CITUS CODE END */
+}
+
+
+static AclMode
+pg_aclmask(ObjectType objtype, Oid table_oid, Oid roleid, AclMode mask, AclMaskHow how)
+{
+	switch (objtype)
+	{
+		case OBJECT_TABLE:
+		case OBJECT_SEQUENCE:
+		{
+			return pg_class_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_DATABASE:
+		{
+			return pg_database_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_FUNCTION:
+		{
+			return pg_proc_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_LANGUAGE:
+		{
+			return pg_language_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_LARGEOBJECT:
+		{
+			return pg_largeobject_aclmask_snapshot(table_oid, roleid,
+												   mask, how, NULL);
+		}
+
+		case OBJECT_SCHEMA:
+		{
+			return pg_namespace_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_STATISTIC_EXT:
+		{
+			elog(ERROR, "grantable rights not supported for statistics objects");
+
+			/* not reached, but keep compiler quiet */
+			return ACL_NO_RIGHTS;
+		}
+
+		case OBJECT_TABLESPACE:
+		{
+			return pg_tablespace_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_FDW:
+		{
+			return pg_foreign_data_wrapper_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_FOREIGN_SERVER:
+		{
+			return pg_foreign_server_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_EVENT_TRIGGER:
+		{
+			elog(ERROR, "grantable rights not supported for event triggers");
+
+			/* not reached, but keep compiler quiet */
+			return ACL_NO_RIGHTS;
+		}
+
+		case OBJECT_TYPE:
+		{
+			return pg_type_aclmask(table_oid, roleid, mask, how);
+		}
+
+		case OBJECT_ROLE:
+		{
+			return mask;
+		}
+
+		case OBJECT_EXTENSION:
+		{
+			return mask;
+		}
+
+		case OBJECT_COLLATION:
+		{
+			return mask;
+		}
+
+		default:
+			elog(ERROR, "unrecognized objtype: %d",
+				 (int) objtype);
+
+			/* not reached, but keep compiler quiet */
+			return ACL_NO_RIGHTS;
+	}
 }
 
 
