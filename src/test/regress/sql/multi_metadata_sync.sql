@@ -849,9 +849,6 @@ SELECT run_command_on_workers('GRANT ALL ON SCHEMA mx_test_schema_2 TO non_super
 
 SET ROLE non_super_metadata_user;
 
-select run_command_on_workers($$select oid || nspname || nspacl::text from pg_namespace where nspname = 'citus'$$);
-SELECT * FROM pg_namespace;
-
 SELECT stop_metadata_sync_to_node('localhost', :worker_1_port);
 SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
 
