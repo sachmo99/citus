@@ -699,10 +699,6 @@ SELECT update_distributed_table_colocation('citus_local_table_4', colocate_with 
 ERROR:  relation citus_local_table_4 should be a hash distributed table
 SELECT master_create_empty_shard('citus_local_table_4');
 ERROR:  relation "citus_local_table_4" is a local table
-CREATE TABLE postgres_local_table (a int);
-SELECT master_append_table_to_shard(shardId, 'postgres_local_table', 'localhost', :master_port)
-FROM (SELECT shardid FROM pg_dist_shard WHERE logicalrelid='citus_local_table_4'::regclass) as shardid;
-ERROR:  cannot append to shardId xxxxxx
 -- return true
 SELECT citus_table_is_visible('citus_local_table_4'::regclass::oid);
  citus_table_is_visible
@@ -728,20 +724,12 @@ FROM (SELECT tableName FROM pg_catalog.pg_tables WHERE tablename LIKE 'citus_loc
 -- cannot create a citus local table from a catalog table
 SELECT citus_add_local_table_to_metadata('pg_class');
 ERROR:  cannot create a citus table from a catalog table
+-- testing foreign key connection between citus local tables,
+-- using the GUC use_citus_managed_tables to add tables to metadata
+SET citus.use_citus_managed_tables TO ON;
 CREATE TABLE referencing_table(a int);
-SELECT citus_add_local_table_to_metadata('referencing_table');
- citus_add_local_table_to_metadata
----------------------------------------------------------------------
-
-(1 row)
-
 CREATE TABLE referenced_table(a int UNIQUE);
-SELECT citus_add_local_table_to_metadata('referenced_table');
- citus_add_local_table_to_metadata
----------------------------------------------------------------------
-
-(1 row)
-
+RESET citus.use_citus_managed_tables;
 ALTER TABLE referencing_table ADD CONSTRAINT fkey_cl_to_cl FOREIGN KEY (a) REFERENCES referenced_table(a);
 NOTICE:  executing the command locally: SELECT worker_apply_inter_shard_ddl_command (xxxxx, 'citus_local_tables_test_schema', xxxxx, 'citus_local_tables_test_schema', 'ALTER TABLE referencing_table ADD CONSTRAINT fkey_cl_to_cl FOREIGN KEY (a) REFERENCES referenced_table(a);')
 -- verify creating citus local table with extended statistics
