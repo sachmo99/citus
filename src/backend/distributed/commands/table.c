@@ -2054,7 +2054,7 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 									ClusterHasKnownMetadataWorkers())
 								{
 									needMetadataSyncForNewSequences = true;
-									MarkSequenceDistributedAndPropagateDependencies(
+									MarkSequenceDistributedAndPropagateWithDependencies(
 										relationId, seqOid);
 									alterTableDefaultNextvalCmd =
 										GetAddColumnWithNextvalDefaultCmd(seqOid,
@@ -2095,8 +2095,8 @@ PostprocessAlterTableStmt(AlterTableStmt *alterTableStatement)
 						ClusterHasKnownMetadataWorkers())
 					{
 						needMetadataSyncForNewSequences = true;
-						MarkSequenceDistributedAndPropagateDependencies(relationId,
-																		seqOid);
+						MarkSequenceDistributedAndPropagateWithDependencies(relationId,
+																			seqOid);
 						alterTableDefaultNextvalCmd = GetAlterColumnWithNextvalDefaultCmd(
 							seqOid, relationId, command->name);
 					}

@@ -567,11 +567,6 @@ MetadataCreateCommands(void)
 
 		EnableDependencyCreation = prevDependencyCreationValue;
 
-		/*
-		 * We need to get sequence DDL commands again as the sequences created
-		 * with MarkSequenceListDistributedAndPropagateDependencies can be dropped
-		 * with queries created by MetadataDropCommands.
-		 */
 		List *workerSequenceDDLCommands = SequenceDDLCommandsForTable(relationId);
 		metadataSnapshotCommandList = list_concat(metadataSnapshotCommandList,
 												  workerSequenceDDLCommands);

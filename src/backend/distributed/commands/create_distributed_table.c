@@ -540,8 +540,8 @@ CreateDistributedTable(Oid relationId, Var *distributionColumn, char distributio
 			 * Ensure sequence dependencies and mark them as distributed
 			 * before creating table metadata on workers
 			 */
-			MarkSequenceListDistributedAndPropagateDependencies(relationId,
-																dependentSequenceList);
+			MarkSequenceListDistributedAndPropagateWithDependencies(relationId,
+																	dependentSequenceList);
 		}
 
 		CreateTableMetadataOnWorkers(relationId);
@@ -673,28 +673,29 @@ AlterSequenceType(Oid seqOid, Oid typeOid)
 
 
 /*
- * MarkSequenceListDistributedAndPropagateDependencies ensures sequences and their
+ * MarkSequenceListDistributedAndPropagateWithDependencies ensures sequences and their
  * dependencies for the given sequence list exist on all nodes and marks the sequences
  * as distributed.
  */
 void
-MarkSequenceListDistributedAndPropagateDependencies(Oid relationId, List *sequenceList)
+MarkSequenceListDistributedAndPropagateWithDependencies(Oid relationId,
+														List *sequenceList)
 {
 	Oid sequenceOid = InvalidOid;
 	foreach_oid(sequenceOid, sequenceList)
 	{
-		MarkSequenceDistributedAndPropagateDependencies(relationId, sequenceOid);
+		MarkSequenceDistributedAndPropagateWithDependencies(relationId, sequenceOid);
 	}
 }
 
 
 /*
- * MarkSequenceDistributedAndPropagateDependencies ensures sequence and its'
+ * MarkSequenceDistributedAndPropagateWithDependencies ensures sequence and its'
  * dependencies for the given sequence exist on all nodes and marks the sequence
  * as distributed.
  */
 void
-MarkSequenceDistributedAndPropagateDependencies(Oid relationId, Oid sequenceOid)
+MarkSequenceDistributedAndPropagateWithDependencies(Oid relationId, Oid sequenceOid)
 {
 	/* get sequence address */
 	ObjectAddress sequenceAddress = { 0 };
