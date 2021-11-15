@@ -996,7 +996,7 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	if (!ShouldSkipMetadataChecks())
 	{
 		/* this UDF is not allowed for executing as a separate command */
-		/* EnsureCoordinatorInitiatedOperation(); */
+		EnsureCoordinatorInitiatedOperation();
 	}
 
 	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray, argsArray,
