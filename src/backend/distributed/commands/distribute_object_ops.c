@@ -157,6 +157,13 @@ static DistributeObjectOps Any_CreatePolicy = {
 	.postprocess = NULL,
 	.address = NULL,
 };
+static DistributeObjectOps Any_CreateFdw = {
+	.deparse = NULL,
+	.qualify = NULL,
+	.preprocess = PreprocessCreateFdwStmt,
+	.postprocess = PostprocessCreateFdwStmt,
+	.address = CreateFdwStmtObjectAddress,
+};
 static DistributeObjectOps Any_CreateForeignServer = {
 	.deparse = NULL,
 	.qualify = NULL,
@@ -851,14 +858,19 @@ GetDistributeObjectOps(Node *node)
 			return &Any_CreateFunction;
 		}
 
-		case T_CreatePolicyStmt:
+		case T_CreateFdwStmt:
 		{
-			return &Any_CreatePolicy;
+			return &Any_CreateFdw;
 		}
 
 		case T_CreateForeignServerStmt:
 		{
 			return &Any_CreateForeignServer;
+		}
+
+		case T_CreatePolicyStmt:
+		{
+			return &Any_CreatePolicy;
 		}
 
 		case T_CreateStatsStmt:
