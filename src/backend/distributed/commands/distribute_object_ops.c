@@ -276,6 +276,13 @@ static DistributeObjectOps Extension_Drop = {
 	.postprocess = NULL,
 	.address = NULL,
 };
+static DistributeObjectOps Fdw_Drop = {
+	.deparse = DeparseDropFdwStmt,
+	.qualify = NULL,
+	.preprocess = PreprocessDropFdwStmt,
+	.postprocess = NULL,
+	.address = NULL,
+};
 static DistributeObjectOps ForeignServer_Drop = {
 	.deparse = DeparseDropForeignServerStmt,
 	.qualify = NULL,
@@ -923,6 +930,11 @@ GetDistributeObjectOps(Node *node)
 				case OBJECT_EXTENSION:
 				{
 					return &Extension_Drop;
+				}
+
+				case OBJECT_FDW:
+				{
+					return &Fdw_Drop;
 				}
 
 				case OBJECT_FUNCTION:
