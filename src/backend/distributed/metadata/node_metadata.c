@@ -428,6 +428,8 @@ citus_disable_node(PG_FUNCTION_ARGS)
 {
 	text *nodeNameText = PG_GETARG_TEXT_P(0);
 	int32 nodePort = PG_GETARG_INT32(1);
+	bool force = false;/*PG_GETARG_BOOL(2); */
+
 	char *nodeName = text_to_cstring(nodeNameText);
 	WorkerNode *workerNode = ModifiableWorkerNode(nodeName, nodePort);
 	bool isActive = false;
@@ -436,13 +438,33 @@ citus_disable_node(PG_FUNCTION_ARGS)
 
 	PG_TRY();
 	{
+		/*
+		 * First, locally mark the node as inactive. We'll later trigger background
+		 * worker to sync the metadata changes to the relevant nodes.
+		 */
+		workerNode =
+			SetWorkerColumnLocalOnly(workerNode,
+									 Anum_pg_dist_node_isactive,
+									 BoolGetDatum(isActive));
+
 		if (NodeIsPrimary(workerNode))
 		{
+			if (!force)
+			{
+				/*
+				 * We do not allow disabling nodes if it contains any
+				 * primary placement. This decision can be overriden by
+				 * the user such as when the node is down and there is no
+				 * other way.
+				 */
+				ErrorIfNodeContainsNonRemovablePlacements(workerNode);
+			}
+
 			/*
 			 * Delete reference table placements so they are not taken into account
 			 * for the check if there are placements after this.
 			 */
-			DeleteAllReferenceTablePlacementsFromNodeGroup(workerNode->groupId);
+			DeleteAllReplicatedTablePlacementsFromNodeGroup(workerNode->groupId);
 
 			if (NodeGroupHasShardPlacements(workerNode->groupId,
 											onlyConsiderActivePlacements))
@@ -458,7 +480,6 @@ citus_disable_node(PG_FUNCTION_ARGS)
 			}
 		}
 
-		SetNodeState(nodeName, nodePort, isActive);
 		TransactionModifiedNodeMetadata = true;
 	}
 	PG_CATCH();
@@ -467,23 +488,14 @@ citus_disable_node(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(savedContext);
 		ErrorData *edata = CopyErrorData();
 
-		if (ClusterHasKnownMetadataWorkers())
-		{
-			ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-							errmsg("Disabling %s:%d failed", workerNode->workerName,
-								   nodePort),
-							errdetail("%s", edata->message),
-							errhint(
-								"If you are using MX, try stop_metadata_sync_to_node(hostname, port) "
-								"for nodes that are down before disabling them.")));
-		}
-		else
-		{
-			ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-							errmsg("Disabling %s:%d failed", workerNode->workerName,
-								   nodePort),
-							errdetail("%s", edata->message)));
-		}
+		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+						errmsg("disabling %s:%d failed", workerNode->workerName,
+							   nodePort),
+						errdetail("%s", edata->message),
+						errhint("You can force disabling node, but this operation "
+								"might cause data loss: SELECT "
+								"citus_disable_node('%s', %d, force:=true);",
+								workerNode->workerName, nodePort)));
 	}
 	PG_END_TRY();
 
@@ -1303,7 +1315,7 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 		 * Delete reference table placements so they are not taken into account
 		 * for the check if there are placements after this.
 		 */
-		DeleteAllReferenceTablePlacementsFromNodeGroup(workerNode->groupId);
+		DeleteAllReplicatedTablePlacementsFromNodeGroup(workerNode->groupId);
 
 		/*
 		 * Secondary nodes are read-only, never 2PC is used.
