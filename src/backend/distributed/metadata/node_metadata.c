@@ -483,8 +483,8 @@ citus_disable_node(PG_FUNCTION_ARGS)
 		TransactionModifiedNodeMetadata = true;
 
 		/* all the active nodes should get the metadata updates */
-		bool force = true;
-		TriggerSyncMetadataToPrimaryNodes(force);
+		bool forceMetadataSyncToAllNodes = true;
+		TriggerSyncMetadataToPrimaryNodes(forceMetadataSyncToAllNodes);
 	}
 	PG_CATCH();
 	{
@@ -1314,6 +1314,8 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 	if (NodeIsPrimary(workerNode))
 	{
 		ErrorIfNodeContainsNonRemovablePlacements(workerNode);
+
+		if (LockShardListResourcesOnFirstWorker)
 
 		/*
 		 * Delete reference table placements so they are not taken into account
