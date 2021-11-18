@@ -1315,8 +1315,6 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 	{
 		ErrorIfNodeContainsNonRemovablePlacements(workerNode);
 
-		if (LockShardListResourcesOnFirstWorker)
-
 		/*
 		 * Delete reference table placements so they are not taken into account
 		 * for the check if there are placements after this.
