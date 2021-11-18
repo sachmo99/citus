@@ -782,35 +782,11 @@ COMMIT;
 
 TRUNCATE collections_list;
 
--- make sure that even if local execution is used, the sequence values
--- are generated locally
+-- Show that altering sequences is not working from worker node
 ALTER SEQUENCE collections_list_key_seq NO MINVALUE NO MAXVALUE;
-
-PREPARE serial_prepared_local AS INSERT INTO collections_list (collection_id) VALUES (0) RETURNING key, ser;
-
-SELECT setval('collections_list_key_seq', 4);
-EXECUTE serial_prepared_local;
-SELECT setval('collections_list_key_seq', 5);
-EXECUTE serial_prepared_local;
-SELECT setval('collections_list_key_seq', 499);
-EXECUTE serial_prepared_local;
-SELECT setval('collections_list_key_seq', 700);
-EXECUTE serial_prepared_local;
-SELECT setval('collections_list_key_seq', 708);
-EXECUTE serial_prepared_local;
-SELECT setval('collections_list_key_seq', 709);
-EXECUTE serial_prepared_local;
 
 -- get ready for the next executions
 DELETE FROM collections_list WHERE key IN (5,6);
-SELECT setval('collections_list_key_seq', 4);
-EXECUTE serial_prepared_local;
-SELECT setval('collections_list_key_seq', 5);
-EXECUTE serial_prepared_local;
-
--- and, one remote test
-SELECT setval('collections_list_key_seq', 10);
-EXECUTE serial_prepared_local;
 
 -- the final queries for the following CTEs are going to happen on the intermediate results only
 -- one of them will be executed remotely, and the other is locally

@@ -1704,130 +1704,11 @@ NOTICE:  executing the command locally: SELECT key, ser, ts, collection_id, valu
 
 COMMIT;
 TRUNCATE collections_list;
--- make sure that even if local execution is used, the sequence values
--- are generated locally
+-- Show that altering sequences is not working from worker node
 ALTER SEQUENCE collections_list_key_seq NO MINVALUE NO MAXVALUE;
-PREPARE serial_prepared_local AS INSERT INTO collections_list (collection_id) VALUES (0) RETURNING key, ser;
-SELECT setval('collections_list_key_seq', 4);
- setval
----------------------------------------------------------------------
-      4
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500009 (key, ser, collection_id) VALUES ('5'::bigint, '3940649673949187'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
-   5 | 3940649673949187
-(1 row)
-
-SELECT setval('collections_list_key_seq', 5);
- setval
----------------------------------------------------------------------
-      5
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500011 (key, ser, collection_id) VALUES ('6'::bigint, '3940649673949188'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
-   6 | 3940649673949188
-(1 row)
-
-SELECT setval('collections_list_key_seq', 499);
- setval
----------------------------------------------------------------------
-    499
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500011 (key, ser, collection_id) VALUES ('500'::bigint, '3940649673949189'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
- 500 | 3940649673949189
-(1 row)
-
-SELECT setval('collections_list_key_seq', 700);
- setval
----------------------------------------------------------------------
-    700
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500009 (key, ser, collection_id) VALUES ('701'::bigint, '3940649673949190'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
- 701 | 3940649673949190
-(1 row)
-
-SELECT setval('collections_list_key_seq', 708);
- setval
----------------------------------------------------------------------
-    708
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500011 (key, ser, collection_id) VALUES ('709'::bigint, '3940649673949191'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
- 709 | 3940649673949191
-(1 row)
-
-SELECT setval('collections_list_key_seq', 709);
- setval
----------------------------------------------------------------------
-    709
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500009 (key, ser, collection_id) VALUES ('710'::bigint, '3940649673949192'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
- 710 | 3940649673949192
-(1 row)
-
+ERROR:  Altering a distributed sequence is currently not supported.
 -- get ready for the next executions
 DELETE FROM collections_list WHERE key IN (5,6);
-SELECT setval('collections_list_key_seq', 4);
- setval
----------------------------------------------------------------------
-      4
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500009 (key, ser, collection_id) VALUES ('5'::bigint, '3940649673949193'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
-   5 | 3940649673949193
-(1 row)
-
-SELECT setval('collections_list_key_seq', 5);
- setval
----------------------------------------------------------------------
-      5
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500011 (key, ser, collection_id) VALUES ('6'::bigint, '3940649673949194'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
-   6 | 3940649673949194
-(1 row)
-
--- and, one remote test
-SELECT setval('collections_list_key_seq', 10);
- setval
----------------------------------------------------------------------
-     10
-(1 row)
-
-EXECUTE serial_prepared_local;
-NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.collections_list_1500012 (key, ser, collection_id) VALUES ('11'::bigint, '3940649673949195'::bigint, 0) RETURNING key, ser
- key |       ser
----------------------------------------------------------------------
-  11 | 3940649673949195
-(1 row)
-
 -- the final queries for the following CTEs are going to happen on the intermediate results only
 -- one of them will be executed remotely, and the other is locally
 -- Citus currently doesn't allow using task_assignment_policy for intermediate results
@@ -2278,6 +2159,7 @@ CALL register_for_event(19, 1, 'yes');
 SET citus.log_local_commands TO ON;
 SET client_min_messages TO DEBUG2;
 CALL register_for_event(19, 1, 'yes');
+DEBUG:  stored procedure does not have co-located tables
 NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replicated.event_responses_1501001 AS citus_table_alias (event_id, user_id, response) VALUES (19, 1, 'yes'::local_shard_execution_replicated.invite_resp) ON CONFLICT(event_id, user_id) DO UPDATE SET response = excluded.response
 NOTICE:  executing the command locally: SELECT count(*) AS count FROM local_shard_execution_replicated.event_responses_1501001 event_responses WHERE (event_id OPERATOR(pg_catalog.=) 19)
 NOTICE:  executing the command locally: SELECT count(*) AS count FROM (SELECT NULL::integer AS event_id, NULL::integer AS user_id, NULL::local_shard_execution_replicated.invite_resp AS response WHERE false) event_responses(event_id, user_id, response) WHERE ((event_id OPERATOR(pg_catalog.=) 19) AND false)
@@ -2335,6 +2217,7 @@ NOTICE:  executing the command locally: INSERT INTO local_shard_execution_replic
 SET citus.enable_local_execution TO false;
 SET citus.enable_fast_path_router_planner TO false;
 CALL register_for_event(19, 1, 'yes');
+DEBUG:  stored procedure does not have co-located tables
 -- should be fine even if no parameters exists in the query
 SELECT count(*) FROM event_responses WHERE event_id = 16;
 DEBUG:  Creating router plan

@@ -102,8 +102,7 @@ SELECT DISTINCT(groupid) FROM ref ORDER BY 1;
  groupid
 ---------------------------------------------------------------------
       14
-      18
-(2 rows)
+(1 row)
 
 TRUNCATE TABLE ref;
 RESET citus.task_assignment_policy;
