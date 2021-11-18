@@ -382,6 +382,7 @@ ROLLBACK;
 
 RESET citus.replicate_reference_tables_on_activate;
 SELECT citus_remove_node('localhost', :master_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE TABLE superuser_columnar_table (a int) USING columnar;
 

@@ -262,3 +262,4 @@ DROP TABLE test_2pcskip;
 DROP TABLE test_reference;
 
 SELECT 1 FROM master_remove_node('localhost', :master_port);
+SELECT public.wait_until_metadata_sync(30000);

@@ -127,6 +127,7 @@ SELECT count(1) FROM pg_dist_node WHERE nodename='localhost' AND nodeport=5432;
 \c - - - :master_port
 DROP INDEX mx_test_uniq_index;
 SELECT 1 FROM master_add_inactive_node('localhost', 5432);
+SELECT public.wait_until_metadata_sync(30000);
 
 \c - - - :worker_1_port
 SELECT master_remove_node('localhost', 5432);
@@ -134,6 +135,7 @@ SELECT count(1) FROM pg_dist_node WHERE nodename='localhost' AND nodeport=5432;
 
 \c - - - :master_port
 SELECT master_remove_node('localhost', 5432);
+SELECT public.wait_until_metadata_sync(30000);
 
 \c - - - :worker_1_port
 
@@ -231,6 +233,10 @@ SELECT stop_metadata_sync_to_node('localhost', :worker_1_port);
 DELETE FROM pg_dist_node;
 SELECT worker_drop_distributed_table(logicalrelid::regclass::text) FROM pg_dist_partition;
 \c - - - :master_port
+-- clean-up broken shards
+DELETE FROM pg_dist_shard WHERE shardid >=1270000 AND shardid <= 1271000;
+DELETE FROM pg_dist_shard_placement WHERE shardid >=1270000 AND shardid <= 1271000;
+
 ALTER SEQUENCE pg_catalog.pg_dist_colocationid_seq RESTART :last_colocation_id;
 
 RESET citus.shard_replication_factor;

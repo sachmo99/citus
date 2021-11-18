@@ -20,6 +20,7 @@ SELECT master_get_active_worker_nodes();
 
 -- try to remove a node (with no placements)
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- verify that the node has been deleted
 SELECT master_get_active_worker_nodes();
@@ -27,6 +28,7 @@ SELECT master_get_active_worker_nodes();
 -- try to disable a node with no placements see that node is removed
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 SELECT master_disable_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT master_get_active_worker_nodes();
 
 -- add some shard placements to the cluster
@@ -56,6 +58,7 @@ SELECT shardid, shardstate, nodename, nodeport FROM pg_dist_shard_placement WHER
 
 -- try to remove a node with active placements and see that node removal is failed
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT master_get_active_worker_nodes();
 
 -- insert a row so that master_disable_node() exercises closing connections
@@ -65,14 +68,17 @@ INSERT INTO test_reference_table VALUES (1, '1');
 
 -- try to remove a node with active placements and reference tables
 SELECT citus_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- try to disable a node with active placements see that node is removed
 -- observe that a notification is displayed
-SELECT master_disable_node('localhost', :worker_2_port);
+SELEcT citus_disable_node('localhost', :worker_2_port, force:=true);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT master_get_active_worker_nodes();
 
 -- try to disable a node which does not exist and see that an error is thrown
 SELECT master_disable_node('localhost.noexist', 2345);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- drop the table without leaving a shard placement behind (messes up other tests)
 SELECT master_activate_node('localhost', :worker_2_port);
@@ -99,6 +105,7 @@ SELECT run_command_on_workers('GRANT ALL ON pg_dist_node TO node_metadata_user')
 SELECT run_command_on_workers('GRANT ALL ON pg_dist_local_group TO node_metadata_user');
 
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- Removing public schema from pg_dist_object because it breaks the next tests
 DELETE FROM citus.pg_dist_object WHERE objid = 'public'::regnamespace::oid;
@@ -119,13 +126,21 @@ SET citus.enable_object_propagation TO off; -- prevent master activate node to a
 BEGIN;
 SELECT 1 FROM master_add_inactive_node('localhost', :worker_2_port);
 SELECT 1 FROM master_activate_node('localhost', :worker_2_port);
+COMMIT;
+
+-- master_disable_node && master_remove_node
+-- cannot be called in a tx block
 SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
 SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
+
+BEGIN;
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 SELECT 1 FROM master_add_secondary_node('localhost', :worker_2_port + 2, 'localhost', :worker_2_port);
 SELECT master_update_node(nodeid, 'localhost', :worker_2_port + 3) FROM pg_dist_node WHERE nodeport = :worker_2_port;
 SELECT nodename, nodeport, noderole FROM pg_dist_node ORDER BY nodeport;
 ABORT;
+
 
 \c - postgres - :master_port
 SET citus.next_shard_id TO 1220000;
@@ -155,6 +170,7 @@ SELECT shardid, shardstate, nodename, nodeport FROM pg_dist_shard_placement WHER
 
 -- try to remove a node with only inactive placements and see that removal still fails
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT master_get_active_worker_nodes();
 
 -- mark all placements in the candidate node as to be deleted
@@ -198,19 +214,23 @@ SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
 -- test that you are allowed to remove secondary nodes even if there are placements
 SELECT 1 FROM master_add_node('localhost', 9990, groupid => :new_group, noderole => 'secondary');
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT master_remove_node('localhost', 9990);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- clean-up
 DROP TABLE cluster_management_test;
 
 -- check that adding/removing nodes are propagated to nodes with metadata
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 \c - - - :worker_1_port
 SELECT nodename, nodeport FROM pg_dist_node WHERE nodename='localhost' AND nodeport=:worker_2_port;
 \c - - - :master_port
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 \c - - - :worker_1_port
 SELECT nodename, nodeport FROM pg_dist_node WHERE nodename='localhost' AND nodeport=:worker_2_port;
 \c - - - :master_port
@@ -228,6 +248,7 @@ SET citus.enable_object_propagation TO off; -- prevent object propagation on add
 SELECT
 	master_remove_node('localhost', :worker_1_port),
 	master_remove_node('localhost', :worker_2_port);
+	SELECT public.wait_until_metadata_sync(30000);
 SELECT count(1) FROM pg_dist_node;
 
 -- check that adding two nodes in the same transaction works
@@ -236,21 +257,21 @@ SELECT
 	master_add_node('localhost', :worker_2_port);
 SELECT * FROM pg_dist_node ORDER BY nodeid;
 
--- check that mixed add/remove node commands work fine inside transaction
-BEGIN;
+-- check that mixed add/remove node commands work fine outside transaction
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 SELECT master_remove_node('localhost', :worker_2_port);
-COMMIT;
+SELECT public.wait_until_metadata_sync(30000);
 
 SELECT nodename, nodeport FROM pg_dist_node WHERE nodename='localhost' AND nodeport=:worker_2_port;
 
 SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
-BEGIN;
+
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
-COMMIT;
 
 SELECT nodename, nodeport FROM pg_dist_node WHERE nodename='localhost' AND nodeport=:worker_2_port;
 
@@ -268,6 +289,8 @@ SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 SET citus.shard_count TO 4;
 
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
+
 BEGIN;
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 CREATE TABLE temp(col1 text, col2 int);
@@ -317,7 +340,9 @@ SELECT 1 FROM master_add_inactive_node('localhost', 9996, groupid => :worker_2_g
 SELECT master_add_inactive_node('localhost', 9999, groupid => :worker_2_group, nodecluster => 'olap', noderole => 'secondary');
 SELECT master_activate_node('localhost', 9999);
 SELECT master_disable_node('localhost', 9999);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT master_remove_node('localhost', 9999);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- check that you can't manually add two primaries to a group
 INSERT INTO pg_dist_node (nodename, nodeport, groupid, noderole)
@@ -368,6 +393,7 @@ SELECT * FROM pg_dist_node WHERE nodeid = :worker_1_node;
 
 -- cleanup
 SELECT master_update_node(:worker_1_node, 'localhost', :worker_1_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT * FROM pg_dist_node WHERE nodeid = :worker_1_node;
 
 SET client_min_messages TO ERROR;

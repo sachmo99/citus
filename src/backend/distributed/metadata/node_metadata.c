@@ -428,7 +428,7 @@ citus_disable_node(PG_FUNCTION_ARGS)
 {
 	text *nodeNameText = PG_GETARG_TEXT_P(0);
 	int32 nodePort = PG_GETARG_INT32(1);
-	bool force = false;/*PG_GETARG_BOOL(2); */
+	bool force = PG_GETARG_BOOL(2);
 
 	char *nodeName = text_to_cstring(nodeNameText);
 	WorkerNode *workerNode = ModifiableWorkerNode(nodeName, nodePort);
@@ -449,6 +449,9 @@ citus_disable_node(PG_FUNCTION_ARGS)
 
 		if (NodeIsPrimary(workerNode))
 		{
+			ErrorIfCoordinatorMetadataSetFalse(workerNode, BoolGetDatum(isActive),
+											   "isactive");
+
 			if (!force)
 			{
 				/*
@@ -1361,7 +1364,7 @@ TriggerSyncMetadataToPrimaryNodes(bool force)
 	foreach_ptr(workerNode, workerList)
 	{
 		/* if already has metadata, no need to do it again */
-		if (!workerNode->hasMetadata)
+		if (!workerNode->hasMetadata && EnableMetadataSyncByDefault)
 		{
 			/*
 			 * Let the maintanince deamon do the hard work of syncing the metadata. We prefer

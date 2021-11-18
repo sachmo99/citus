@@ -191,6 +191,12 @@ SELECT 1 FROM master_add_inactive_node('localhost', 5432);
         1
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 \c - - - :worker_1_port
 SELECT master_remove_node('localhost', 5432);
 ERROR:  operation is not allowed on this node
@@ -204,6 +210,12 @@ SELECT count(1) FROM pg_dist_node WHERE nodename='localhost' AND nodeport=5432;
 \c - - - :master_port
 SELECT master_remove_node('localhost', 5432);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -385,5 +397,8 @@ SELECT worker_drop_distributed_table(logicalrelid::regclass::text) FROM pg_dist_
 (0 rows)
 
 \c - - - :master_port
+-- clean-up broken shards
+DELETE FROM pg_dist_shard WHERE shardid >=1270000 AND shardid <= 1271000;
+DELETE FROM pg_dist_shard_placement WHERE shardid >=1270000 AND shardid <= 1271000;
 ALTER SEQUENCE pg_catalog.pg_dist_colocationid_seq RESTART :last_colocation_id;
 RESET citus.shard_replication_factor;

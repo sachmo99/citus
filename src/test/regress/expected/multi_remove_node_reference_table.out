@@ -20,6 +20,12 @@ SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
 -- remove non-existing node
 SELECT master_remove_node('localhost', 55555);
 ERROR:  node at "localhost:xxxxx" does not exist
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- remove a node with no reference tables
 -- verify node exist before removal
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
@@ -39,6 +45,12 @@ SELECT create_distributed_table('recovery_test','x');
 DROP TABLE recovery_test;
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -100,6 +112,12 @@ SELECT master_disable_node('localhost', 9001);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT isactive FROM pg_dist_node WHERE nodeport = 9001;
  isactive
 ---------------------------------------------------------------------
@@ -128,6 +146,12 @@ SELECT count(*) FROM pg_dist_placement WHERE groupid = :worker_2_group;
 -- make sure when we remove a secondary we don't remove any placements
 SELECT master_remove_node('localhost', 9001);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -192,6 +216,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
  count
@@ -224,6 +254,12 @@ SELECT master_remove_node('localhost', :worker_1_port);
 ERROR:  cannot remove or disable the node localhost:xxxxx because there are some Citus tables with the only healthy shard placements on the node
 DETAIL:  One of the table(s) that prevents the operation complete successfully is test_schema_support."nation._'append"
 HINT:  To proceed, either drop the tables or use undistribute_table() function to convert them to local tables
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 \c - - - :worker_1_port
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
  count
@@ -246,6 +282,12 @@ SET citus.replicate_reference_tables_on_activate TO off;
 -- remove same node twice
 SELECT master_remove_node('localhost', :worker_2_port);
 ERROR:  node at "localhost:xxxxx" does not exist
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- re-add the node for next tests
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
  ?column?
@@ -260,8 +302,20 @@ SELECT master_disable_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -328,6 +382,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 (1 row)
 
 ROLLBACK;
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
  count
@@ -429,6 +489,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 (1 row)
 
 COMMIT;
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
  count
@@ -539,6 +605,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 (1 row)
 
 COMMIT;
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
  count
@@ -662,6 +734,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 (1 row)
 
 COMMIT;
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
  count
@@ -754,13 +832,19 @@ WHERE colocationid IN
           1 |                -1 |                      0
 (1 row)
 
-BEGIN;
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
 ---------------------------------------------------------------------
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
+BEGIN;
 DROP TABLE remove_node_reference_table;
 COMMIT;
 -- status after master_remove_node
@@ -865,6 +949,12 @@ ORDER BY
 \c - - - :master_port
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -975,6 +1065,12 @@ ORDER BY shardid ASC;
 \c - - - :master_port
 SELECT master_disable_node('localhost', :worker_2_port);
  master_disable_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)

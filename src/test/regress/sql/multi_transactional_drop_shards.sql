@@ -372,6 +372,7 @@ SELECT create_distributed_table('citus_local', 'id');
 INSERT INTO citus_local (k) VALUES (2);
 DROP TABLE citus_local;
 SELECT master_remove_node('localhost', :master_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- clean the workspace
 DROP TABLE transactional_drop_shards, transactional_drop_reference;

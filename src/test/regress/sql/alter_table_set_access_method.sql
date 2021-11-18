@@ -280,3 +280,4 @@ COMMIT;
 SET client_min_messages TO WARNING;
 DROP SCHEMA alter_table_set_access_method CASCADE;
 SELECT 1 FROM master_remove_node('localhost', :master_port);
+SELECT public.wait_until_metadata_sync(30000);

@@ -651,6 +651,12 @@ SELECT citus_remove_node('localhost', :master_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE superuser_columnar_table (a int) USING columnar;
 CREATE USER read_access;
 NOTICE:  not propagating CREATE ROLE/USER commands to worker nodes

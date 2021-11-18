@@ -402,6 +402,7 @@ SELECT compression FROM columnar.options WHERE regclass = 'table_option_citus_lo
 
 DROP TABLE table_option_citus_local, table_option_citus_local_2;
 SELECT 1 FROM master_remove_node('localhost', :master_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- verify reference table with no columns can be created
 -- https://github.com/citusdata/citus/issues/4608

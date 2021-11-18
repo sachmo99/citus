@@ -1,5 +1,5 @@
-test: multi_cluster_management
 test: multi_test_helpers multi_test_helpers_superuser multi_create_fdw
+test: multi_cluster_management
 test: multi_test_catalog_views
 
 # ----------
@@ -53,9 +53,10 @@ test: subquery_prepared_statements
 test: non_colocated_leaf_subquery_joins non_colocated_subquery_joins
 test: cte_inline recursive_view_local_table values
 test: pg13 pg12
-# run pg14 sequentially as it syncs metadata
+# run pg14 and tableam sequentially as it changes metadata
 test: pg14
-test: tableam drop_column_partitioned_table
+test: tableam
+test: drop_column_partitioned_table
 
 # mx-less tests
 test: check_mx

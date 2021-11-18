@@ -19,7 +19,7 @@ SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
 
 -- remove non-existing node
 SELECT master_remove_node('localhost', 55555);
-
+SELECT public.wait_until_metadata_sync(30000);
 
 -- remove a node with no reference tables
 
@@ -31,6 +31,7 @@ CREATE TABLE recovery_test (x int, y int);
 SELECT create_distributed_table('recovery_test','x');
 DROP TABLE recovery_test;
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT recover_prepared_transactions();
 SELECT count(*) FROM pg_dist_transaction;
 
@@ -52,6 +53,7 @@ SELECT 1 FROM master_add_node('localhost', 9001, groupid=>:worker_2_group, noder
 SELECT count(*) FROM pg_dist_placement WHERE groupid = :worker_2_group;
 -- make sure when we disable a secondary we don't remove any placements
 SELECT master_disable_node('localhost', 9001);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT isactive FROM pg_dist_node WHERE nodeport = 9001;
 SELECT count(*) FROM pg_dist_placement WHERE groupid = :worker_2_group;
 -- make sure when we activate a secondary we don't add any placements
@@ -59,6 +61,7 @@ SELECT 1 FROM master_activate_node('localhost', 9001);
 SELECT count(*) FROM pg_dist_placement WHERE groupid = :worker_2_group;
 -- make sure when we remove a secondary we don't remove any placements
 SELECT master_remove_node('localhost', 9001);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT count(*) FROM pg_dist_placement WHERE groupid = :worker_2_group;
 
 -- status before master_remove_node
@@ -92,6 +95,7 @@ WHERE
 \c - - - :master_port
 
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
@@ -111,6 +115,7 @@ WHERE colocationid IN
      WHERE logicalrelid = 'remove_node_reference_table'::regclass);
 
 SELECT master_remove_node('localhost', :worker_1_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 \c - - - :worker_1_port
 
@@ -128,13 +133,17 @@ SET citus.replicate_reference_tables_on_activate TO off;
 
 -- remove same node twice
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- re-add the node for next tests
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 
 -- try to disable the node before removing it (this used to crash)
 SELECT master_disable_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
+
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- re-add the node for the next test
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
@@ -174,6 +183,7 @@ WHERE
 BEGIN;
 SELECT master_remove_node('localhost', :worker_2_port);
 ROLLBACK;
+SELECT public.wait_until_metadata_sync(30000);
 
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
@@ -240,6 +250,8 @@ WHERE
 BEGIN;
 SELECT master_remove_node('localhost', :worker_2_port);
 COMMIT;
+SELECT public.wait_until_metadata_sync(30000);
+
 
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
@@ -311,6 +323,8 @@ BEGIN;
 INSERT INTO remove_node_reference_table VALUES(1);
 SELECT master_remove_node('localhost', :worker_2_port);
 COMMIT;
+
+SELECT public.wait_until_metadata_sync(30000);
 
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
@@ -389,6 +403,9 @@ ALTER TABLE remove_node_reference_table ADD column2 int;
 SELECT master_remove_node('localhost', :worker_2_port);
 COMMIT;
 
+SELECT public.wait_until_metadata_sync(30000);
+
+
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
 
@@ -448,8 +465,10 @@ WHERE colocationid IN
      FROM pg_dist_partition
      WHERE logicalrelid = 'remove_node_reference_table'::regclass);
 
-BEGIN;
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
+
+BEGIN;
 DROP TABLE remove_node_reference_table;
 COMMIT;
 
@@ -511,6 +530,7 @@ ORDER BY
 \c - - - :master_port
 
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- status after master_remove_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
@@ -583,6 +603,7 @@ ORDER BY shardid ASC;
 \c - - - :master_port
 
 SELECT master_disable_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- status after master_disable_node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;

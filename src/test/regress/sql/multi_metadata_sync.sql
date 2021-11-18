@@ -536,6 +536,7 @@ DELETE FROM pg_dist_placement;
 DELETE FROM pg_dist_partition;
 SELECT groupid AS old_worker_2_group FROM pg_dist_node WHERE nodeport = :worker_2_port \gset
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
  -- the master user needs superuser permissions to change the replication model
 CREATE USER mx_user WITH SUPERUSER;
@@ -657,6 +658,7 @@ CREATE TABLE tmp_placement AS
 DELETE FROM pg_dist_placement
   WHERE groupid = :old_worker_2_group;
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 CREATE TABLE mx_ref (col_1 int, col_2 text);
 SELECT create_reference_table('mx_ref');
 
@@ -745,10 +747,11 @@ SELECT create_reference_table('dist_table_2');
 ALTER TABLE dist_table_1 ADD COLUMN b int;
 
 SELECT master_add_node('localhost', :master_port, groupid => 0);
-SELECT master_disable_node('localhost', :worker_1_port);
-SELECT master_disable_node('localhost', :worker_2_port);
+SELECT citus_disable_node('localhost', :worker_1_port);
+SELECT citus_disable_node('localhost', :worker_2_port);
 SELECT master_remove_node('localhost', :worker_1_port);
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- master_update_node should succeed
 SELECT nodeid AS worker_2_nodeid FROM pg_dist_node WHERE nodeport=:worker_2_port \gset

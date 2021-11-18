@@ -15,6 +15,7 @@
 # ---
 # Tests around schema changes, these are run first, so there's no preexisting objects.
 # ---
+test: multi_test_helpers multi_test_helpers_superuser
 test: turn_mx_off
 test: multi_extension
 test: single_node
@@ -31,7 +32,6 @@ test: escape_extension_name
 test: ref_citus_local_fkeys
 test: alter_database_owner
 
-test: multi_test_helpers multi_test_helpers_superuser
 test: multi_test_catalog_views
 test: multi_table_ddl
 test: multi_sequence_default
@@ -308,7 +308,9 @@ test: ssl_by_default
 # object distribution tests
 # ---------
 test: distributed_types distributed_types_conflict disable_object_propagation distributed_types_xact_add_enum_value
+test: turn_mx_on
 test: distributed_functions distributed_functions_conflict
+test: turn_mx_off
 test: distributed_collations distributed_collations_conflict
 test: distributed_procedure
 

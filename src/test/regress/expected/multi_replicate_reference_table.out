@@ -21,6 +21,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- test adding new node with no reference tables
 -- verify there is no node with nodeport = :worker_2_port before adding the node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
@@ -56,6 +62,12 @@ WHERE
 -- test adding new node with a reference table which does not have any healthy placement
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -221,6 +233,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE replicate_reference_table_rollback(column1 int);
 SELECT create_reference_table('replicate_reference_table_rollback');
  create_reference_table
@@ -349,6 +367,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE replicate_reference_table_reference_one(column1 int);
 SELECT create_reference_table('replicate_reference_table_reference_one');
  create_reference_table
@@ -450,6 +474,12 @@ DROP TABLE replicate_reference_table_reference_two;
 -- test inserting a value then adding a new node in a transaction
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -560,6 +590,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE SCHEMA replicate_reference_table_schema;
 CREATE TABLE replicate_reference_table_schema.table1(column1 int);
 SELECT create_reference_table('replicate_reference_table_schema.table1');
@@ -627,6 +663,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE ref_table_1(id int primary key, v int);
 CREATE TABLE ref_table_2(id int primary key, v int references ref_table_1(id));
 CREATE TABLE ref_table_3(id int primary key, v int references ref_table_2(id));
@@ -680,6 +722,12 @@ DROP TABLE ref_table_1, ref_table_2, ref_table_3;
 -- do some tests with inactive node
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -745,6 +793,12 @@ SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
  ?column?
 ---------------------------------------------------------------------
         1
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
 (1 row)
 
 CREATE TABLE ref_table(a int);
@@ -837,6 +891,12 @@ SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
         1
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT count(*) - :ref_table_placements FROM pg_dist_shard_placement WHERE shardid = :ref_table_shard;
  ?column?
 ---------------------------------------------------------------------
@@ -882,6 +942,12 @@ SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
         1
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- test setting citus.replicate_reference_tables_on_activate to on
 -- master_add_node
 SET citus.replicate_reference_tables_on_activate TO on;
@@ -902,6 +968,12 @@ SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
  ?column?
 ---------------------------------------------------------------------
         1
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
 (1 row)
 
 SELECT 1 FROM master_add_inactive_node('localhost', :worker_2_port);
@@ -943,6 +1015,12 @@ SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
         1
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
  ?column?
 ---------------------------------------------------------------------
@@ -980,6 +1058,12 @@ SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
  ?column?
 ---------------------------------------------------------------------
         1
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
 (1 row)
 
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
@@ -1042,6 +1126,12 @@ SET citus.replicate_reference_tables_on_activate TO off;
 SET citus.shard_replication_factor TO 1;
 SELECT master_remove_node('localhost', :worker_2_port);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)

@@ -31,6 +31,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- reproduction case as described in #3378
 CREATE TABLE zoop_table (x int, y decimal(4, 4));
 SELECT create_distributed_table('zoop_table','x');

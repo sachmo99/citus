@@ -150,6 +150,12 @@ SELECT master_remove_node('localhost', :master_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 --
 -- Range partitioned table using a non-default table access method
 --

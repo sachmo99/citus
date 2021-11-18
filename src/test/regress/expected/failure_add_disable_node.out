@@ -142,6 +142,12 @@ SELECT master_remove_node('localhost', :worker_2_proxy_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- verify node is removed
 SELECT * FROM master_get_active_worker_nodes()
 ORDER BY 1, 2;
@@ -170,6 +176,12 @@ SELECT master_add_inactive_node('localhost', :worker_2_proxy_port);
 
 SELECT master_remove_node('localhost', :worker_2_proxy_port);
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)

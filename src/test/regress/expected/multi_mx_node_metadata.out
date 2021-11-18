@@ -647,6 +647,12 @@ SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
         1
 (1 row)
 
+SELECT wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT verify_metadata('localhost', :worker_1_port);
  verify_metadata
 ---------------------------------------------------------------------
@@ -687,6 +693,12 @@ SELECT 1 FROM master_disable_node('localhost', 1);
  ?column?
 ---------------------------------------------------------------------
         1
+(1 row)
+
+SELECT wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
 (1 row)
 
 -- try again after stopping metadata sync
@@ -753,7 +765,17 @@ SELECT wait_until_metadata_sync(30000);
 UPDATE pg_dist_node SET metadatasynced = TRUE WHERE nodeid IN (:nodeid_1, :nodeid_2);
 -- should error out
 SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
-ERROR:  Disabling localhost:xxxxx failed
+ ?column?
+---------------------------------------------------------------------
+        1
+(1 row)
+
+SELECT wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- try again after stopping metadata sync
 SELECT stop_metadata_sync_to_node('localhost', 1);
 NOTICE:  dropping metadata on the node (localhost,1)
@@ -766,6 +788,12 @@ SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
  ?column?
 ---------------------------------------------------------------------
         1
+(1 row)
+
+SELECT wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
 (1 row)
 
 -- bring up node 1

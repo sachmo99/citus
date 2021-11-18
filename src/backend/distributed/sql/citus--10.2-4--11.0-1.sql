@@ -13,3 +13,5 @@ UPDATE pg_catalog.pg_dist_partition SET autoconverted = TRUE WHERE partmethod = 
 
 REVOKE ALL ON FUNCTION start_metadata_sync_to_node(text, integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION stop_metadata_sync_to_node(text, integer,bool) FROM PUBLIC;
+
+#include "udfs/citus_disable_node/11.0-1.sql"

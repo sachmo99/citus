@@ -20,8 +20,9 @@ SELECT * FROM pg_dist_shard_placement WHERE shardid BETWEEN 1370000 AND 1380000;
 -- remove a node for testing purposes
 CREATE TABLE tmp_shard_placement AS SELECT * FROM pg_dist_shard_placement WHERE nodeport = :worker_2_port;
 DELETE FROM pg_dist_shard_placement WHERE nodeport = :worker_2_port;
-SELECT master_remove_node('localhost', :worker_2_port);
 
+SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- test adding new node with no reference tables
 
@@ -44,6 +45,7 @@ WHERE
 
 -- test adding new node with a reference table which does not have any healthy placement
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- verify there is no node with nodeport = :worker_2_port before adding the node
 SELECT COUNT(*) FROM pg_dist_node WHERE nodeport = :worker_2_port;
@@ -144,6 +146,7 @@ DROP TABLE replicate_reference_table_valid;
 
 -- test replicating a reference table when a new node added in TRANSACTION + ROLLBACK
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE TABLE replicate_reference_table_rollback(column1 int);
 SELECT create_reference_table('replicate_reference_table_rollback');
@@ -228,6 +231,7 @@ DROP TABLE replicate_reference_table_commit;
 
 -- test adding new node + upgrading another hash distributed table to reference table + creating new reference table in TRANSACTION
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE TABLE replicate_reference_table_reference_one(column1 int);
 SELECT create_reference_table('replicate_reference_table_reference_one');
@@ -296,6 +300,7 @@ DROP TABLE replicate_reference_table_reference_two;
 
 -- test inserting a value then adding a new node in a transaction
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE TABLE replicate_reference_table_insert(column1 int);
 SELECT create_reference_table('replicate_reference_table_insert');
@@ -378,6 +383,7 @@ SELECT * FROM pg_dist_colocation WHERE colocationid = 1370009;
 
 -- test adding a node while there is a reference table at another schema
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE SCHEMA replicate_reference_table_schema;
 CREATE TABLE replicate_reference_table_schema.table1(column1 int);
@@ -421,6 +427,7 @@ DROP SCHEMA replicate_reference_table_schema CASCADE;
 
 -- test adding a node when there are foreign keys between reference tables
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE TABLE ref_table_1(id int primary key, v int);
 CREATE TABLE ref_table_2(id int primary key, v int references ref_table_1(id));
@@ -457,6 +464,7 @@ DROP TABLE ref_table_1, ref_table_2, ref_table_3;
 
 -- do some tests with inactive node
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE TABLE initially_not_replicated_reference_table (key int);
 SELECT create_reference_table('initially_not_replicated_reference_table');
@@ -496,6 +504,7 @@ WHERE
 ORDER BY 1,4,5;
 
 SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE TABLE ref_table(a int);
 SELECT create_reference_table('ref_table');
@@ -549,6 +558,7 @@ SELECT count(*) AS ref_table_placements FROM pg_dist_shard_placement WHERE shard
 
 -- remove reference table replica from worker 2
 SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 SELECT count(*) - :ref_table_placements FROM pg_dist_shard_placement WHERE shardid = :ref_table_shard;
 
@@ -564,6 +574,7 @@ SELECT count(*) - :ref_table_placements FROM pg_dist_shard_placement WHERE shard
 
 DROP TABLE range_table;
 SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- test setting citus.replicate_reference_tables_on_activate to on
 -- master_add_node
@@ -574,6 +585,7 @@ SELECT count(*) - :ref_table_placements FROM pg_dist_shard_placement WHERE shard
 
 -- master_activate_node
 SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT 1 FROM master_add_inactive_node('localhost', :worker_2_port);
 
 SELECT count(*) - :ref_table_placements FROM pg_dist_shard_placement WHERE shardid = :ref_table_shard;
@@ -588,6 +600,7 @@ SELECT min(result) = max(result) AS consistent FROM run_command_on_placements('r
 -- reference table shards
 SET citus.replicate_reference_tables_on_activate TO off;
 SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 
 SET citus.shard_replication_factor TO 1;
@@ -606,6 +619,8 @@ WHERE nodeport=:worker_1_port;
 
 -- test that metadata is synced on replicate_reference_tables
 SELECT 1 FROM master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
+
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 
 SELECT replicate_reference_tables();
@@ -647,6 +662,7 @@ SET citus.replicate_reference_tables_on_activate TO off;
 SET citus.shard_replication_factor TO 1;
 
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 CREATE TABLE ref (a int primary key, b int);
 SELECT create_reference_table('ref');

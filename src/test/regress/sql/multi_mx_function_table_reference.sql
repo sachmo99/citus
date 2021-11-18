@@ -19,6 +19,7 @@ SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
 -- remove worker 2, so we can add it after we have created some functions that caused
 -- problems
 SELECT master_remove_node('localhost', :worker_2_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- reproduction case as described in #3378
 CREATE TABLE zoop_table (x int, y decimal(4, 4));

@@ -177,6 +177,7 @@ SELECT create_distributed_table('streaming_table','id');
 
 -- make sure that none of the active and primary nodes hasmetadata
 -- at the start of the test
+SELECT stop_metadata_sync_to_node(nodename, nodeport) FROM pg_dist_node WHERE isactive AND  noderole = 'primary';
 select bool_or(hasmetadata) from pg_dist_node WHERE isactive AND  noderole = 'primary';
 
 -- if not paremeters are supplied, we'd see that function doesn't have
@@ -190,6 +191,7 @@ SELECT * FROM run_command_on_workers($$SELECT function_tests."eq_mi'xed_param_na
 
 -- make sure that none of the active and primary nodes hasmetadata
 -- since the function doesn't have a parameter
+SELECT stop_metadata_sync_to_node(nodename, nodeport) FROM pg_dist_node WHERE isactive AND  noderole = 'primary';
 select bool_or(hasmetadata) from pg_dist_node WHERE isactive AND  noderole = 'primary';
 
 -- try to co-locate with a table that uses statement-based replication

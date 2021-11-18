@@ -6,5 +6,6 @@ test: upgrade_basic_before
 test: upgrade_columnar_before
 test: upgrade_ref2ref_before
 test: upgrade_type_before
+test: turn_mx_on
 test: upgrade_distributed_function_before upgrade_rebalance_strategy_before
 test: upgrade_autoconverted_before

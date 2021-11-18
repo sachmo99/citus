@@ -182,7 +182,7 @@ SELECT hasmetadata, metadatasynced, shouldhaveshards FROM pg_dist_node WHERE nod
 
 \c - - - :master_port
 -- verify that mx workers are updated when disabling/activating nodes
-SELECT citus_disable_node('localhost', :worker_1_port);
+SELECT citus_disable_node('localhost', :worker_1_port, force:=true);
 SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
 
 \c - - - :worker_2_port

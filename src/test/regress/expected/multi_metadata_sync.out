@@ -273,7 +273,7 @@ SELECT * FROM pg_dist_node ORDER BY nodeid;
 (4 rows)
 
 SELECT * FROM pg_dist_partition ORDER BY logicalrelid;
-          logicalrelid           | partmethod |                                                         partkey                                                          | colocationid | repmodel | autoconverted
+          logicalrelid           | partmethod |                                                        partkey                                                         | colocationid | repmodel | autoconverted
 ---------------------------------------------------------------------
  mx_testing_schema.mx_test_table | h          | {VAR :varno 1 :varattno 1 :vartype 23 :vartypmod -1 :varcollid 0 :varlevelsup 0 :varnoold 1 :varoattno 1 :location -1} |            0 | s        | f
 (1 row)
@@ -410,7 +410,7 @@ SELECT * FROM pg_dist_node ORDER BY nodeid;
 (4 rows)
 
 SELECT * FROM pg_dist_partition ORDER BY logicalrelid;
-          logicalrelid           | partmethod |                                                         partkey                                                          | colocationid | repmodel | autoconverted
+          logicalrelid           | partmethod |                                                        partkey                                                         | colocationid | repmodel | autoconverted
 ---------------------------------------------------------------------
  mx_testing_schema.mx_test_table | h          | {VAR :varno 1 :varattno 1 :vartype 23 :vartypmod -1 :varcollid 0 :varlevelsup 0 :varnoold 1 :varoattno 1 :location -1} |            0 | s        | f
 (1 row)
@@ -1204,6 +1204,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
  -- the master user needs superuser permissions to change the replication model
 CREATE USER mx_user WITH SUPERUSER;
 NOTICE:  not propagating CREATE ROLE/USER commands to worker nodes
@@ -1418,7 +1424,16 @@ CREATE TABLE tmp_placement AS
 DELETE FROM pg_dist_placement
   WHERE groupid = :old_worker_2_group;
 SELECT master_remove_node('localhost', :worker_2_port);
+WARNING:  could not find any shard placements for shardId 1310001
+WARNING:  could not find any shard placements for shardId 1310021
+WARNING:  could not find any shard placements for shardId 1310026
  master_remove_node
+---------------------------------------------------------------------
+
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
 ---------------------------------------------------------------------
 
 (1 row)
@@ -1585,14 +1600,14 @@ HINT:  If the node is up, wait until metadata gets synced to it and try again.
 SELECT master_add_node('localhost', :master_port, groupid => 0);
 ERROR:  localhost:xxxxx is a metadata node, but is out of sync
 HINT:  If the node is up, wait until metadata gets synced to it and try again.
-SELECT master_disable_node('localhost', :worker_1_port);
-ERROR:  Disabling localhost:xxxxx failed
-DETAIL:  localhost:xxxxx is a metadata node, but is out of sync
-HINT:  If you are using MX, try stop_metadata_sync_to_node(hostname, port) for nodes that are down before disabling them.
-SELECT master_disable_node('localhost', :worker_2_port);
-ERROR:  Disabling localhost:xxxxx failed
-DETAIL:  localhost:xxxxx is a metadata node, but is out of sync
-HINT:  If you are using MX, try stop_metadata_sync_to_node(hostname, port) for nodes that are down before disabling them.
+SELECT citus_disable_node('localhost', :worker_1_port);
+ERROR:  disabling localhost:xxxxx failed
+DETAIL:  cannot remove or disable the node localhost:xxxxx because there are some Citus tables with the only healthy shard placements on the node
+HINT:  You can force disabling node, but this operation might cause data loss: SELECT citus_disable_node('localhost', 57637, force:=true);
+SELECT citus_disable_node('localhost', :worker_2_port);
+ERROR:  disabling localhost:xxxxx failed
+DETAIL:  cannot remove or disable the node localhost:xxxxx because there are some Citus tables with the only healthy shard placements on the node
+HINT:  You can force disabling node, but this operation might cause data loss: SELECT citus_disable_node('localhost', 57638, force:=true);
 SELECT master_remove_node('localhost', :worker_1_port);
 ERROR:  cannot remove or disable the node localhost:xxxxx because there are some Citus tables with the only healthy shard placements on the node
 DETAIL:  One of the table(s) that prevents the operation complete successfully is mx_testing_schema.mx_test_table
@@ -1601,6 +1616,12 @@ SELECT master_remove_node('localhost', :worker_2_port);
 ERROR:  cannot remove or disable the node localhost:xxxxx because there are some Citus tables with the only healthy shard placements on the node
 DETAIL:  One of the table(s) that prevents the operation complete successfully is mx_testing_schema.mx_test_table
 HINT:  To proceed, either drop the tables or use undistribute_table() function to convert them to local tables
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- master_update_node should succeed
 SELECT nodeid AS worker_2_nodeid FROM pg_dist_node WHERE nodeport=:worker_2_port \gset
 SELECT master_update_node(:worker_2_nodeid, 'localhost', 4444);

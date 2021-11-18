@@ -21,6 +21,7 @@ CREATE TABLE postgres_table_test(a int primary key);
 -- reference tables are replicated to the coordinator
 SELECT 1 FROM master_add_node('localhost', :master_port, groupId=>0);
 NOTICE:  Replicating reference table "ref_table_test" to the node localhost:xxxxx
+NOTICE:  localhost:xxxxx is the coordinator and already contains metadata, skipping syncing the metadata
  ?column?
 ---------------------------------------------------------------------
         1
@@ -779,14 +780,10 @@ CREATE TABLE test_schema_support.nation_hash (
     n_regionkey integer not null,
     n_comment varchar(152)
 );
-SELECT master_create_distributed_table('test_schema_support.nation_hash', 'n_nationkey', 'hash');
- master_create_distributed_table
----------------------------------------------------------------------
-
-(1 row)
-
-SELECT master_create_worker_shards('test_schema_support.nation_hash', 4, 1);
- master_create_worker_shards
+SET citus.shard_count TO 4;
+SET citus.shard_replication_factor TO 1;
+SELECT create_distributed_table('test_schema_support.nation_hash', 'n_nationkey', 'hash');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
@@ -797,18 +794,15 @@ CREATE TABLE test_schema_support.nation_hash2 (
     n_regionkey integer not null,
     n_comment varchar(152)
 );
-SELECT master_create_distributed_table('test_schema_support.nation_hash2', 'n_nationkey', 'hash');
- master_create_distributed_table
+SELECT create_distributed_table('test_schema_support.nation_hash2', 'n_nationkey', 'hash');
+ create_distributed_table
 ---------------------------------------------------------------------
 
 (1 row)
 
-SELECT master_create_worker_shards('test_schema_support.nation_hash2', 4, 1);
- master_create_worker_shards
----------------------------------------------------------------------
-
-(1 row)
-
+-- Mark tables as coordinator replicated in order to be able to test replicate_table_shards
+UPDATE pg_dist_partition SET repmodel='c' WHERE logicalrelid IN
+	('test_schema_support.nation_hash2'::regclass, 'test_schema_support.nation_hash'::regclass);
 -- Shard count before replication
 SELECT COUNT(*) FROM pg_dist_shard_placement;
  count
@@ -817,22 +811,22 @@ SELECT COUNT(*) FROM pg_dist_shard_placement;
 (1 row)
 
 SET search_path TO public;
-SELECT replicate_table_shards('test_schema_support.nation_hash', shard_transfer_mode:='block_writes');
+SELECT replicate_table_shards('test_schema_support.nation_hash', shard_replication_factor:=2, max_shard_copies:=1, shard_transfer_mode:='block_writes');
  replicate_table_shards
 ---------------------------------------------------------------------
 
 (1 row)
 
--- Confirm replication
+-- Confirm replication, both tables replicated due to colocation
 SELECT COUNT(*) FROM pg_dist_shard_placement;
  count
 ---------------------------------------------------------------------
-    12
+    10
 (1 row)
 
 -- Test with search_path is set
 SET search_path TO test_schema_support;
-SELECT replicate_table_shards('nation_hash2', shard_transfer_mode:='block_writes');
+SELECT replicate_table_shards('nation_hash2', shard_replication_factor:=2, shard_transfer_mode:='block_writes');
  replicate_table_shards
 ---------------------------------------------------------------------
 
@@ -1444,7 +1438,7 @@ SELECT table_schema, table_name, row_estimate, total_bytes
               , pg_total_relation_size(reltoastrelid) AS toast_bytes
           FROM pg_class c
           LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE relkind = 'r'
+          WHERE relkind = 'r' and relation_is_a_known_shard(c.oid)
   ) a
 WHERE table_schema = 'public'
 ) a ORDER BY table_name;
@@ -1465,7 +1459,7 @@ SELECT table_schema, table_name, row_estimate, total_bytes
               , pg_total_relation_size(reltoastrelid) AS toast_bytes
           FROM pg_class c
           LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE relkind = 'r'
+          WHERE relkind = 'r' and relation_is_a_known_shard(c.oid)
   ) a
 WHERE table_schema = 'public'
 ) a ORDER BY table_name;
@@ -1568,7 +1562,7 @@ SELECT table_schema, table_name, row_estimate, total_bytes
               , pg_total_relation_size(reltoastrelid) AS toast_bytes
           FROM pg_class c
           LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE relkind = 'r'
+          WHERE relkind = 'r' and relation_is_a_known_shard(c.oid)
   ) a
 WHERE table_schema = 'public'
 ) a ORDER BY table_name;
@@ -1589,7 +1583,7 @@ SELECT table_schema, table_name, row_estimate, total_bytes
               , pg_total_relation_size(reltoastrelid) AS toast_bytes
           FROM pg_class c
           LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE relkind = 'r'
+          WHERE relkind = 'r' and relation_is_a_known_shard(c.oid)
   ) a
 WHERE table_schema = 'public'
 ) a ORDER BY table_name;
@@ -1663,7 +1657,7 @@ SELECT table_schema, table_name, row_estimate, total_bytes
               , pg_total_relation_size(reltoastrelid) AS toast_bytes
           FROM pg_class c
           LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE relkind = 'r'
+          WHERE relkind = 'r' and relation_is_a_known_shard(c.oid)
   ) a
 WHERE table_schema = 'public'
 ) a ORDER BY table_name;
@@ -1688,7 +1682,7 @@ SELECT table_schema, table_name, row_estimate, total_bytes
               , pg_total_relation_size(reltoastrelid) AS toast_bytes
           FROM pg_class c
           LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-          WHERE relkind = 'r'
+          WHERE relkind = 'r' and relation_is_a_known_shard(c.oid)
   ) a
 WHERE table_schema = 'public'
 ) a ORDER BY table_name;
@@ -2042,6 +2036,12 @@ SELECT 1 FROM master_remove_node('localhost', :master_port);
         1
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 --
 -- Make sure that rebalance_table_shards() and replicate_table_shards() replicate
 -- reference tables to the coordinator when replicate_reference_tables_on_activate
@@ -2101,6 +2101,12 @@ SELECT 1 FROM master_remove_node('localhost', :master_port);
         1
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE rebalance_test_table(int_column int);
 SELECT master_create_distributed_table('rebalance_test_table', 'int_column', 'append');
  master_create_distributed_table
@@ -2141,6 +2147,12 @@ SELECT 1 FROM master_remove_node('localhost', :master_port);
         1
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 -- reference table 2 will not have a replica identity, causing the rebalancer to not work
 -- when ran in the default mode. Instead we need to change the shard transfer mode to make
 -- it work. This verifies the shard transfer mode used in the rebalancer is used for the
@@ -2154,6 +2166,12 @@ SELECT 1 from master_remove_node('localhost', :worker_2_port);
  ?column?
 ---------------------------------------------------------------------
         1
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
 (1 row)
 
 SELECT create_distributed_table('t1','a');
@@ -2207,6 +2225,12 @@ SELECT 1 from master_remove_node('localhost', :worker_2_port);
         1
 (1 row)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 CREATE TABLE r1 (a int PRIMARY KEY, b int);
 SELECT create_reference_table('r1');
  create_reference_table
@@ -2258,6 +2282,12 @@ SELECT 1 from master_remove_node('localhost', :worker_2_port);
  ?column?
 ---------------------------------------------------------------------
         1
+(1 row)
+
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
 (1 row)
 
 CREATE TABLE t1 (a int PRIMARY KEY, b int);

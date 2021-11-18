@@ -74,6 +74,7 @@ ROLLBACK;
 -- drop event table and re-run remove
 DROP TABLE event_table;
 SELECT master_remove_node('localhost', :worker_2_proxy_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- verify node is removed
 SELECT * FROM master_get_active_worker_nodes()
@@ -90,6 +91,7 @@ ORDER BY placementid;
 SELECT master_add_inactive_node('localhost', :worker_2_proxy_port);
 
 SELECT master_remove_node('localhost', :worker_2_proxy_port);
+SELECT public.wait_until_metadata_sync(30000);
 
 SELECT shardid, shardstate
 FROM pg_dist_placement p JOIN pg_dist_shard s USING (shardid)

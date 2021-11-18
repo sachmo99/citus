@@ -287,6 +287,7 @@ SELECT verify_metadata('localhost', :worker_1_port),
 DROP TABLE dist_table_1, dist_table_2;
 
 SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
+SELECT wait_until_metadata_sync(30000);
 SELECT verify_metadata('localhost', :worker_1_port);
 
 SELECT 1 FROM master_activate_node('localhost', :worker_2_port);
@@ -303,6 +304,7 @@ UPDATE pg_dist_node SET metadatasynced = TRUE WHERE nodeid IN (:nodeid_1, :nodei
 
 -- should not error out, master_disable_node is tolerant for node failures
 SELECT 1 FROM master_disable_node('localhost', 1);
+SELECT wait_until_metadata_sync(30000);
 
 -- try again after stopping metadata sync
 SELECT stop_metadata_sync_to_node('localhost', 1);
@@ -328,10 +330,12 @@ UPDATE pg_dist_node SET metadatasynced = TRUE WHERE nodeid IN (:nodeid_1, :nodei
 
 -- should error out
 SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
+SELECT wait_until_metadata_sync(30000);
 
 -- try again after stopping metadata sync
 SELECT stop_metadata_sync_to_node('localhost', 1);
 SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
+SELECT wait_until_metadata_sync(30000);
 
 -- bring up node 1
 SELECT master_update_node(:nodeid_1, 'localhost', :worker_1_port);
