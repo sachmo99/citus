@@ -481,6 +481,10 @@ citus_disable_node(PG_FUNCTION_ARGS)
 		}
 
 		TransactionModifiedNodeMetadata = true;
+
+		/* all the active nodes should get the metadata updates */
+		bool force = true;
+		TriggerSyncMetadataToPrimaryNodes(force);
 	}
 	PG_CATCH();
 	{
@@ -1329,12 +1333,64 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 
 	RemoveOldShardPlacementForNodeGroup(workerNode->groupId);
 
-	char *nodeDeleteCommand = NodeDeleteCommand(workerNode->nodeId);
-
 	/* make sure we don't have any lingering session lifespan connections */
 	CloseNodeConnectionsAfterTransaction(workerNode->workerName, nodePort);
 
-	SendCommandToWorkersWithMetadata(nodeDeleteCommand);
+	/* all the active nodes should get the metadata updates */
+	bool force = true;
+	TriggerSyncMetadataToPrimaryNodes(force);
+}
+
+
+/*
+ * TriggerSyncMetadataToPrimaryNodes iterates over the active primary nodes,
+ * and triggers the metadata syncs if the node has not the metadata. Later,
+ * maintenance daemon will sync the metadata to nodes.
+ *
+ * If the force flag is set to true, even if the node's current state is
+ * already hasmetadata && metadataSynced, the background worker is forced
+ * to re-write the metadata.
+ */
+void
+TriggerSyncMetadataToPrimaryNodes(bool force)
+{
+	List *workerList = ActivePrimaryNonCoordinatorNodeList(ShareLock);
+	bool triggerMetadataSync = false;
+
+	WorkerNode *workerNode = NULL;
+	foreach_ptr(workerNode, workerList)
+	{
+		/* if already has metadata, no need to do it again */
+		if (!workerNode->hasMetadata)
+		{
+			/*
+			 * Let the maintanince deamon do the hard work of syncing the metadata. We prefer
+			 * this because otherwise node activation might fail withing transaction blocks.
+			 */
+			LockRelationOid(DistNodeRelationId(), ExclusiveLock);
+			SetWorkerColumnLocalOnly(workerNode, Anum_pg_dist_node_hasmetadata,
+									 BoolGetDatum(true));
+
+			triggerMetadataSync = true;
+		}
+		else if (!workerNode->metadataSynced)
+		{
+			triggerMetadataSync = true;
+		}
+		else if (force)
+		{
+			LockRelationOid(DistNodeRelationId(), ExclusiveLock);
+			SetWorkerColumnLocalOnly(workerNode, Anum_pg_dist_node_metadatasynced,
+									 BoolGetDatum(false));
+			triggerMetadataSync = true;
+		}
+	}
+
+	/* let the maintanince deamon know about the metadata sync */
+	if (triggerMetadataSync)
+	{
+		TriggerMetadataSyncOnCommit();
+	}
 }
 
 

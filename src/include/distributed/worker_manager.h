@@ -103,6 +103,7 @@ extern WorkerNode * SetWorkerColumnLocalOnly(WorkerNode *workerNode, int columnI
 											 Datum value);
 extern uint32 CountPrimariesWithMetadata(void);
 extern WorkerNode * GetFirstPrimaryWorkerNode(void);
+extern void TriggerSyncMetadataToPrimaryNodes(bool force);
 
 /* Function declarations for worker node utilities */
 extern int CompareWorkerNodes(const void *leftElement, const void *rightElement);
