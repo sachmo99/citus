@@ -185,7 +185,8 @@ create_distributed_function(PG_FUNCTION_ARGS)
 	const char *createFunctionSQL = GetFunctionDDLCommand(funcOid, true);
 	const char *alterFunctionOwnerSQL = GetFunctionAlterOwnerCommand(funcOid);
 	initStringInfo(&ddlCommand);
-	appendStringInfo(&ddlCommand, "%s;%s", createFunctionSQL, alterFunctionOwnerSQL);
+	appendStringInfo(&ddlCommand, "%s;%s;%s;%s", DISABLE_OBJECT_PROPAGATION,
+					 createFunctionSQL, alterFunctionOwnerSQL, ENABLE_OBJECT_PROPAGATION);
 	SendCommandToWorkersAsUser(NON_COORDINATOR_NODES, CurrentUserName(), ddlCommand.data);
 
 	MarkObjectDistributed(&functionAddress);
@@ -1462,6 +1463,7 @@ PreprocessAlterFunctionOwnerStmt(Node *node, const char *queryString,
 	}
 
 	EnsureCoordinator();
+
 	EnsureSequentialModeForFunctionDDL();
 	QualifyTreeNode((Node *) stmt);
 	const char *sql = DeparseTreeNode((Node *) stmt);

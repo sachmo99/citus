@@ -252,6 +252,12 @@ SELECT * FROM run_command_on_workers($$SELECT function_tests.dup('0123456789ab')
  localhost |    57638 | t       | (01:23:45:67:89:ab,"01:23:45:67:89:ab is text")
 (2 rows)
 
+SELECT public.wait_until_metadata_sync(30000);
+ wait_until_metadata_sync
+---------------------------------------------------------------------
+
+(1 row)
+
 SELECT create_distributed_function('eq(macaddr,macaddr)', '$1', colocate_with := 'streaming_table');
  create_distributed_function
 ---------------------------------------------------------------------
