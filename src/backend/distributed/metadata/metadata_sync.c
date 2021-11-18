@@ -101,6 +101,7 @@ static GrantStmt * GenerateGrantOnSchemaStmtForRights(Oid roleOid,
 													  Oid schemaOid,
 													  char *permission,
 													  bool withGrantOption);
+static void SetLocalEnableDependencyCreation(bool state);
 static char * GenerateSetRoleQuery(Oid roleOid);
 static void MetadataSyncSigTermHandler(SIGNAL_ARGS);
 static void MetadataSyncSigAlrmHandler(SIGNAL_ARGS);
@@ -540,7 +541,7 @@ MetadataCreateCommands(void)
 		ObjectAddressSet(tableAddress, RelationRelationId, relationId);
 
 		bool prevDependencyCreationValue = EnableDependencyCreation;
-		EnableDependencyCreation = false;
+		SetLocalEnableDependencyCreation(false);
 
 		EnsureDependenciesExistOnAllNodes(&tableAddress);
 
@@ -561,7 +562,7 @@ MetadataCreateCommands(void)
 			MarkObjectDistributed(&sequenceAddress);
 		}
 
-		EnableDependencyCreation = prevDependencyCreationValue;
+		SetLocalEnableDependencyCreation(prevDependencyCreationValue);
 
 		List *workerSequenceDDLCommands = SequenceDDLCommandsForTable(relationId);
 		metadataSnapshotCommandList = list_concat(metadataSnapshotCommandList,
@@ -669,6 +670,10 @@ DistributedObjectSyncCommandList(void)
 	Relation pgDistObjectRel = table_open(DistObjectRelationId(), AccessShareLock);
 	TupleDesc pgDistObjectDesc = RelationGetDescr(pgDistObjectRel);
 
+	List *objectAddresses = NIL;
+	List *distributionArgumentIndexes = NIL;
+	List *colocationIds = NIL;
+
 	SysScanDesc pgDistObjectScan = systable_beginscan(pgDistObjectRel, InvalidOid, false,
 													  NULL, 0, NULL);
 	while (HeapTupleIsValid(pgDistObjectTup = systable_getnext(pgDistObjectScan)))
@@ -684,17 +689,22 @@ DistributedObjectSyncCommandList(void)
 		int32 distributionArgumentIndex = DatumGetInt32(
 			heap_getattr(pgDistObjectTup, Anum_pg_dist_object_distribution_argument_index,
 						 pgDistObjectDesc, &distributionArgumentIndexIsNull));
+
 		bool colocationIdIsNull = true;
 		int32 colocationId = DatumGetInt32(
 			heap_getattr(pgDistObjectTup, Anum_pg_dist_object_distribution_argument_index,
 						 pgDistObjectDesc, &colocationIdIsNull));
 
-		char *workerMetadataUpdateCommand = MarkObjectDistributedCreateCommand(
-			&address,
-			distributionArgumentIndexIsNull ? NULL : &distributionArgumentIndex,
-			colocationIdIsNull ? NULL : &colocationId);
-		commandList = lappend(commandList, workerMetadataUpdateCommand);
+		objectAddresses = lappend(objectAddresses, &address);
+		distributionArgumentIndexes = lappend(distributionArgumentIndexes,
+											  distributionArgumentIndexIsNull ? NULL :
+											  &distributionArgumentIndex);
+		colocationIds = lappend(colocationIds, colocationIdIsNull ? NULL : &colocationId);
 	}
+
+	char *workerMetadataUpdateCommand = MarkObjectsDistributedCreateCommand(
+		objectAddresses, distributionArgumentIndexes, colocationIds);
+	commandList = lappend(commandList, workerMetadataUpdateCommand);
 
 	systable_endscan(pgDistObjectScan);
 	relation_close(pgDistObjectRel, AccessShareLock);
@@ -880,81 +890,116 @@ NodeListInsertCommand(List *workerNodeList)
 
 
 /*
- * MarkObjectDistributedCreateCommand generates a command that can be executed to
- * insert or update the provided object into pg_dist_object on a worker node.
+ * MarkObjectsDistributedCreateCommand generates a command that can be executed to
+ * insert or update the provided objects into pg_dist_object on a worker node.
  */
 char *
-MarkObjectDistributedCreateCommand(const ObjectAddress *address,
-								   int32 *distributionArgumentIndex,
-								   int32 *colocationId)
+MarkObjectsDistributedCreateCommand(List *addresses,
+									List *distributionArgumentIndexes,
+									List *colocationIds)
 {
-	StringInfo insertDistributedObjectCommand = makeStringInfo();
-	List *names;
-	List *args;
-	char *objectType;
-#if PG_VERSION_NUM >= PG_VERSION_14
-	objectType = getObjectTypeDescription(address, false);
-	getObjectIdentityParts(address, &names, &args, false);
-#else
-	objectType = getObjectTypeDescription(address);
-	getObjectIdentityParts(address, &names, &args);
-#endif
+	StringInfo insertDistributedObjectsCommand = makeStringInfo();
+	int currentObjectCounter;
 
-	appendStringInfo(insertDistributedObjectCommand,
-					 "SELECT citus_internal_add_object_metadata(");
+	Assert(list_length(addresses) == list_length(distributionArgumentIndexes));
+	Assert(list_length(distributionArgumentIndexes) == list_length(colocationIds));
 
-	appendStringInfo(insertDistributedObjectCommand,
-					 "%s, ARRAY[",
-					 quote_literal_cstr(objectType));
+	appendStringInfo(insertDistributedObjectsCommand,
+					 "WITH distributed_object_data(typetext, objnames, "
+					 "objargs, distargumentindex, colocationid)  AS (VALUES ");
 
-	char *name;
-	bool firstLoop = true;
-	foreach_ptr(name, names)
+	bool isFirstValue = true;
+	for (currentObjectCounter = 0; currentObjectCounter < list_length(addresses);
+		 currentObjectCounter++)
 	{
-		if (!firstLoop)
+		ObjectAddress *address = list_nth(addresses, currentObjectCounter);
+		int32 *distributionArgumentIndex = list_nth(distributionArgumentIndexes,
+													currentObjectCounter);
+		int32 *colocationId = list_nth(colocationIds, currentObjectCounter);
+		List *names;
+		List *args;
+		char *objectType;
+
+		#if PG_VERSION_NUM >= PG_VERSION_14
+		objectType = getObjectTypeDescription(address, false);
+		getObjectIdentityParts(address, &names, &args, false);
+		#else
+		objectType = getObjectTypeDescription(address);
+		getObjectIdentityParts(address, &names, &args);
+		#endif
+
+		if (!isFirstValue)
 		{
-			appendStringInfo(insertDistributedObjectCommand, ", ");
+			/*
+			 * As long as this is not the first placement of the first shard,
+			 * append the comma.
+			 */
+			appendStringInfo(insertDistributedObjectsCommand, ", ");
 		}
-		firstLoop = false;
-		appendStringInfoString(insertDistributedObjectCommand, quote_literal_cstr(name));
-	}
+		isFirstValue = false;
 
-	appendStringInfo(insertDistributedObjectCommand, "]::text[], ARRAY[");
+		appendStringInfo(insertDistributedObjectsCommand,
+						 "(%s, ARRAY[",
+						 quote_literal_cstr(objectType));
 
-	char *arg;
-	firstLoop = true;
-	foreach_ptr(arg, args)
-	{
-		if (!firstLoop)
+		char *name;
+		bool firstLoop = true;
+		foreach_ptr(name, names)
 		{
-			appendStringInfo(insertDistributedObjectCommand, ", ");
+			if (!firstLoop)
+			{
+				appendStringInfo(insertDistributedObjectsCommand, ", ");
+			}
+			firstLoop = false;
+			appendStringInfoString(insertDistributedObjectsCommand, quote_literal_cstr(
+									   name));
 		}
-		firstLoop = false;
-		appendStringInfoString(insertDistributedObjectCommand, quote_literal_cstr(arg));
+
+		appendStringInfo(insertDistributedObjectsCommand, "]::text[], ARRAY[");
+
+		char *arg;
+		firstLoop = true;
+		foreach_ptr(arg, args)
+		{
+			if (!firstLoop)
+			{
+				appendStringInfo(insertDistributedObjectsCommand, ", ");
+			}
+			firstLoop = false;
+			appendStringInfoString(insertDistributedObjectsCommand, quote_literal_cstr(
+									   arg));
+		}
+
+		appendStringInfo(insertDistributedObjectsCommand, "]::text[],");
+
+		if (distributionArgumentIndex == NULL)
+		{
+			appendStringInfo(insertDistributedObjectsCommand, "NULL, ");
+		}
+		else
+		{
+			appendStringInfo(insertDistributedObjectsCommand, "%d, ",
+							 *distributionArgumentIndex);
+		}
+		if (colocationId == NULL)
+		{
+			appendStringInfo(insertDistributedObjectsCommand, "NULL)");
+		}
+		else
+		{
+			appendStringInfo(insertDistributedObjectsCommand, "%d)",
+							 *colocationId);
+		}
 	}
 
-	appendStringInfo(insertDistributedObjectCommand, "]::text[],");
+	appendStringInfo(insertDistributedObjectsCommand, ") ");
 
-	if (distributionArgumentIndex == NULL)
-	{
-		appendStringInfo(insertDistributedObjectCommand, "NULL, ");
-	}
-	else
-	{
-		appendStringInfo(insertDistributedObjectCommand, "%d, ",
-						 *distributionArgumentIndex);
-	}
-	if (colocationId == NULL)
-	{
-		appendStringInfo(insertDistributedObjectCommand, "NULL)");
-	}
-	else
-	{
-		appendStringInfo(insertDistributedObjectCommand, "%d)",
-						 *colocationId);
-	}
+	appendStringInfo(insertDistributedObjectsCommand,
+					 "SELECT citus_internal_add_object_metadata("
+					 "typetext, objnames, objargs, distargumentindex::int, colocationid::int) "
+					 "FROM distributed_object_data;");
 
-	return insertDistributedObjectCommand->data;
+	return insertDistributedObjectsCommand->data;
 }
 
 
@@ -1775,6 +1820,18 @@ GenerateGrantOnSchemaStmtForRights(Oid roleOid,
 	stmt->grantees = list_make1(roleSpec);
 	stmt->grant_option = withGrantOption;
 	return stmt;
+}
+
+
+/*
+ * SetLocalEnableDependencyCreation sets the enable_object_propagation locally
+ */
+static void
+SetLocalEnableDependencyCreation(bool state)
+{
+	set_config_option("citus.enable_object_propagation", state == true ? "on" : "off",
+					  (superuser() ? PGC_SUSET : PGC_USERSET), PGC_S_SESSION,
+					  GUC_ACTION_LOCAL, true, 0, false);
 }
 
 

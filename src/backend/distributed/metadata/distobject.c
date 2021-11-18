@@ -173,8 +173,13 @@ MarkObjectDistributed(const ObjectAddress *distAddress)
 
 	if (EnableDependencyCreation)
 	{
-		char *workerPgDistObjectUpdateCommand = MarkObjectDistributedCreateCommand(
-			distAddress, NULL, NULL);
+		/* create a list by adding the address of value to not to have warning */
+		List *addresses = NIL;
+		ObjectAddress addressToUse = *distAddress;
+		addresses = lappend(addresses, &addressToUse);
+
+		char *workerPgDistObjectUpdateCommand = MarkObjectsDistributedCreateCommand(
+			addresses, list_make1(NULL), list_make1(NULL));
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }
