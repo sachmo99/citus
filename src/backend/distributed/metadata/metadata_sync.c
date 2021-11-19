@@ -935,10 +935,6 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 
 		if (!isFirstValue)
 		{
-			/*
-			 * As long as this is not the first placement of the first shard,
-			 * append the comma.
-			 */
 			appendStringInfo(insertDistributedObjectsCommand, ", ");
 		}
 		isFirstValue = false;
