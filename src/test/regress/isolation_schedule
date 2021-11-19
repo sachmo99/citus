@@ -9,7 +9,7 @@ test: isolation_add_node_vs_reference_table_operations
 test: isolation_master_update_node
 test: isolation_shouldhaveshards
 
-test: isolation_extension_commands
+# test: isolation_extension_commands
 
 # tests that change node metadata should precede
 # isolation_cluster_management such that tests
