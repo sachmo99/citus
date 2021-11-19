@@ -8,7 +8,7 @@ ALTER SYSTEM SET citus.metadata_sync_interval TO 3000;
 ALTER SYSTEM SET citus.metadata_sync_retry_interval TO 500;
 SELECT pg_reload_conf();
 
--- Verifies pg_dist_node and pg_dist_palcement in the given worker matches the ones in coordinator
+-- Verifies pg_dist_node, pg_dist_placement and pg_dist_object in the given worker matches the ones in coordinator
 CREATE OR REPLACE FUNCTION verify_metadata(hostname TEXT, port INTEGER, master_port INTEGER DEFAULT 57636)
     RETURNS BOOLEAN
     LANGUAGE sql
@@ -30,9 +30,17 @@ WITH dist_node_summary AS (
         master_run_on_worker(ARRAY[hostname, 'localhost'], ARRAY[port, master_port],
                             ARRAY[dist_placement_summary.query, dist_placement_summary.query],
                             false)
+), dist_object_summary AS (
+    SELECT 'SELECT jsonb_agg(ROW(classid, objid, objsubid, distribution_argument_index, colocationid) ORDER BY classid, objid, objsubid) FROM pg_dist_object' AS query
+), dist_object_check AS (
+    SELECT count(distinct result) = 1 AS matches
+    FROM dist_object_summary CROSS JOIN LATERAL
+        master_run_on_worker(ARRAY[hostname, 'localhost'], ARRAY[port, master_port],
+                            ARRAY[dist_object_summary.query, dist_object_summary.query],
+                            false)
 )
-SELECT dist_node_check.matches AND dist_placement_check.matches
-FROM dist_node_check CROSS JOIN dist_placement_check
+SELECT dist_node_check.matches AND dist_placement_check.matches AND dist_object_check.matches
+FROM dist_node_check CROSS JOIN dist_placement_check CROSS JOIN dist_object_check
 $$;
 
 

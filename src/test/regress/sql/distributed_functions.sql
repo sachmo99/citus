@@ -17,6 +17,15 @@ CREATE TABLE notices (
 SELECT create_distributed_table('notices', 'id');
 INSERT INTO notices VALUES (1, 'hello world');
 
+-- Create the necessary test utility function
+CREATE FUNCTION master_metadata_snapshot()
+    RETURNS text[]
+    LANGUAGE C STRICT
+    AS 'citus';
+
+COMMENT ON FUNCTION master_metadata_snapshot()
+    IS 'commands to create the metadata snapshot';
+
 CREATE FUNCTION notice(text)
 RETURNS void
 LANGUAGE plpgsql AS $$
@@ -362,6 +371,9 @@ SELECT run_command_on_workers($$SELECT count(*) FROM pg_proc WHERE proname='eq_w
 
 -- valid distribution with distribution_arg_name -- case insensitive
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', distribution_arg_name:='VaL1');
+
+-- show that we are able to propagate objects with multiple item on address arrays
+SELECT unnest(master_metadata_snapshot()) order by 1;
 
 -- valid distribution with distribution_arg_index
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)','$1');
