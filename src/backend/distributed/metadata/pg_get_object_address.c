@@ -2,7 +2,7 @@
  *
  * pg_get_object_address.c
  *
- * Copied functions from Postgres pg_dist_object_address with owner check.
+ * Copied functions from Postgres pg_get_object_address with acl check.
  * We need to copy that function to use obtained node to check ownership.
  *
  * Copyright (c) Citus Data, Inc.
@@ -34,7 +34,7 @@ static List * textarray_to_strvaluelist(ArrayType *arr);
  * is checked and if it is not the current user function will error out.
  *
  * This function is mostly copied from pg_get_object_address of the PG code. We need
- * to copy that function to use intermediate data types to check ownership.
+ * to copy that function to use intermediate data types to check acl or ownership.
  */
 ObjectAddress
 PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool accessCheck)
@@ -426,9 +426,8 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool acc
 			case OBJECT_SEQUENCE:
 			case OBJECT_TABLE:
 			{
-				idToCheck = RelationGetRelid(relation);
-				aclMaskResult = pg_class_aclmask(idToCheck, userId, ACL_SELECT,
-												 ACLMASK_ANY);
+				/* function errors out if user is not the owner of the object */
+				check_object_ownership(userId, type, addr, objnode, relation);
 				break;
 			}
 

@@ -48,6 +48,7 @@ extern void SwitchToSequentialAndLocalExecutionIfPartitionNameTooLong(Oid
  * postprocess: executed after standard_ProcessUtility.
  * address: return an ObjectAddress for the subject of the statement.
  *          2nd parameter is missing_ok.
+ * markDistribued: true if the object will be distributed.
  *
  * preprocess/postprocess return a List of DDLJobs.
  */

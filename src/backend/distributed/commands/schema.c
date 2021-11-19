@@ -147,6 +147,10 @@ PreprocessGrantOnSchemaStmt(Node *node, const char *queryString,
 		return NIL;
 	}
 
+	/*
+	 * Since access control needs to be handled manually on community, we need to support
+	 * such queries by handling them locally on worker nodes.
+	 */
 	if (GetLocalGroupId() != COORDINATOR_GROUP_ID)
 	{
 		return NIL;

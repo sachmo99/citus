@@ -1463,7 +1463,6 @@ PreprocessAlterFunctionOwnerStmt(Node *node, const char *queryString,
 	}
 
 	EnsureCoordinator();
-
 	EnsureSequentialModeForFunctionDDL();
 	QualifyTreeNode((Node *) stmt);
 	const char *sql = DeparseTreeNode((Node *) stmt);

@@ -537,7 +537,7 @@ CreateDistributedTable(Oid relationId, Var *distributionColumn, char distributio
 		if (ClusterHasKnownMetadataWorkers())
 		{
 			/*
-			 * Ensure sequence dependencies and mark them as distributed
+			 * Ensure sequence with dependencies and mark them as distributed
 			 * before creating table metadata on workers
 			 */
 			MarkSequenceListDistributedAndPropagateWithDependencies(relationId,
@@ -674,8 +674,7 @@ AlterSequenceType(Oid seqOid, Oid typeOid)
 
 /*
  * MarkSequenceListDistributedAndPropagateWithDependencies ensures sequences and their
- * dependencies for the given sequence list exist on all nodes and marks the sequences
- * as distributed.
+ * dependencies for the given sequence list exist on all nodes and marks them as distributed.
  */
 void
 MarkSequenceListDistributedAndPropagateWithDependencies(Oid relationId,
@@ -691,8 +690,7 @@ MarkSequenceListDistributedAndPropagateWithDependencies(Oid relationId,
 
 /*
  * MarkSequenceDistributedAndPropagateWithDependencies ensures sequence and its'
- * dependencies for the given sequence exist on all nodes and marks the sequence
- * as distributed.
+ * dependencies for the given sequence exist on all nodes and marks them as distributed.
  */
 void
 MarkSequenceDistributedAndPropagateWithDependencies(Oid relationId, Oid sequenceOid)
@@ -708,7 +706,7 @@ MarkSequenceDistributedAndPropagateWithDependencies(Oid relationId, Oid sequence
 
 /*
  * EnsureSequenceExistForRelation ensures sequence for the given relation
- * exist on each worker node.
+ * exist on each worker node with metadata.
  */
 static void
 EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid)

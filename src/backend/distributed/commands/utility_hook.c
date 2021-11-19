@@ -720,7 +720,10 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 			}
 		}
 
-		/* Mark object distributed as the last step */
+		/*
+		 * Since we must have objects on workers before distributing them,
+		 * mark object distributed as the last step.
+		 */
 		if (ops && ops->markDistributed)
 		{
 			ObjectAddress address = GetObjectAddressFromParseTree(parsetree, false);

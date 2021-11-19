@@ -540,6 +540,11 @@ MetadataCreateCommands(void)
 		 */
 		ObjectAddressSet(tableAddress, RelationRelationId, relationId);
 
+		/*
+		 * Since we might have unsynced metadata workers here, mark objects distributed
+		 * locally while creating dependencies for sequences. Commands that propagate
+		 * object's metadata will be created at the end of this function.
+		 */
 		bool prevDependencyCreationValue = EnableDependencyCreation;
 		SetLocalEnableDependencyCreation(false);
 
