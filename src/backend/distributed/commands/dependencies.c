@@ -96,6 +96,16 @@ EnsureDependenciesExistOnAllNodes(const ObjectAddress *target)
 		return;
 	}
 
+	/*
+	 * Lock dependent objects explicitly to make sure same DDL command won't be sent
+	 * multiple times from parallel sessions.
+	 */
+	foreach_ptr(dependency, dependenciesWithCommands)
+	{
+		LockDatabaseObject(dependency->classId, dependency->objectId,
+						   dependency->objectSubId, ExclusiveLock);
+	}
+
 
 	WorkerNode *workerNode = NULL;
 	foreach_ptr(workerNode, workerNodeList)
