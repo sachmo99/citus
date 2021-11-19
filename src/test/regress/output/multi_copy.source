@@ -847,8 +847,9 @@ DROP TABLE numbers_reference;
 -- test copy failure inside the node
 -- it will be done by changing definition of a shard table
 SET citus.shard_count to 4;
+SET citus.next_shard_id TO 560170;
 CREATE TABLE numbers_hash(a int, b int);
-SELECT create_distributed_table('numbers_hash', 'a');
+SELECT create_distributed_table('numbers_hash', 'a', colocate_with:='none');
  create_distributed_table
 ---------------------------------------------------------------------
 
