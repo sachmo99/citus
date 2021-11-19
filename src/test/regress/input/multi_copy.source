@@ -540,7 +540,7 @@ SELECT * FROM run_command_on_workers('CREATE USER test_user');
 \c - test_user
 SET citus.shard_count to 4;
 CREATE TABLE numbers_hash (a int, b int);
-SELECT create_distributed_table('numbers_hash', 'a');
+SELECT create_distributed_table('numbers_hash', 'a', colocate_with:='none');
 
 COPY numbers_hash FROM STDIN WITH (FORMAT 'csv');
 1,1
@@ -568,7 +568,7 @@ COPY numbers_reference FROM STDIN WITH (FORMAT 'csv');
 
 -- create another hash distributed table
 CREATE TABLE numbers_hash_other(a int, b int);
-SELECT create_distributed_table('numbers_hash_other', 'a');
+SELECT create_distributed_table('numbers_hash_other', 'a', colocate_with:='numbers_hash');
 SELECT shardid, shardstate, nodename, nodeport
 	FROM pg_dist_shard_placement join pg_dist_shard using(shardid)
 	WHERE logicalrelid = 'numbers_hash_other'::regclass order by shardid, nodeport;
@@ -587,22 +587,28 @@ SET session_replication_role = DEFAULT;
 ALTER USER test_user WITH nologin;
 \c - test_user - :master_port
 
-BEGIN;
-        -- reissue copy, and it should fail
-        COPY numbers_hash FROM STDIN WITH (FORMAT 'csv');
-        \.
-ROLLBACK;
+-- reissue copy, and it should fail
+COPY numbers_hash FROM STDIN WITH (FORMAT 'csv');
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+8,8
+\.
 
 -- verify shards in the none of the workers as marked invalid
 SELECT shardid, shardstate, nodename, nodeport
 	FROM pg_dist_shard_placement join pg_dist_shard using(shardid)
 	WHERE logicalrelid = 'numbers_hash'::regclass order by shardid, nodeport;
 
-BEGIN;
-        -- try to insert into a reference table copy should fail
-        COPY numbers_reference FROM STDIN WITH (FORMAT 'csv');
-        \.
-ROLLBACK;
+-- try to insert into a reference table copy should fail
+COPY numbers_reference FROM STDIN WITH (FORMAT 'csv');
+3,1
+4,2
+\.
 
 -- verify shards for reference table are still valid
 SELECT shardid, shardstate, nodename, nodeport
@@ -613,10 +619,11 @@ SELECT shardid, shardstate, nodename, nodeport
 -- try to insert into numbers_hash_other. copy should fail and rollback
 -- since it can not insert into either copies of a shard. shards are expected to
 -- stay valid since the operation is rolled back.
-BEGIN;
-        COPY numbers_hash_other FROM STDIN WITH (FORMAT 'csv');
-        \.
-ROLLBACK;
+COPY numbers_hash_other FROM STDIN WITH (FORMAT 'csv');
+1,1
+2,2
+3,3
+\.
 
 -- verify shards for numbers_hash_other are still valid
 -- since copy has failed altogether
