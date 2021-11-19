@@ -426,9 +426,9 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr, bool acc
 			case OBJECT_SEQUENCE:
 			case OBJECT_TABLE:
 			{
-				idToCheck = RelationGetRelid(relation);
-				aclMaskResult = pg_class_aclmask(idToCheck, userId, ACL_SELECT,
-												 ACLMASK_ANY);
+				/* function errors out if user is not the owner of the object */
+				check_object_ownership(userId, type, addr, objnode, relation);
+				aclMaskResult = 1;
 				break;
 			}
 
