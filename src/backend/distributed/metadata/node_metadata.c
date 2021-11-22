@@ -428,11 +428,10 @@ citus_disable_node(PG_FUNCTION_ARGS)
 {
 	text *nodeNameText = PG_GETARG_TEXT_P(0);
 	int32 nodePort = PG_GETARG_INT32(1);
-	bool force = PG_GETARG_BOOL(2);
+	bool forceDisableNode = PG_GETARG_BOOL(2);
 
 	char *nodeName = text_to_cstring(nodeNameText);
 	WorkerNode *workerNode = ModifiableWorkerNode(nodeName, nodePort);
-	bool isActive = false;
 	bool onlyConsiderActivePlacements = false;
 	MemoryContext savedContext = CurrentMemoryContext;
 
@@ -442,6 +441,7 @@ citus_disable_node(PG_FUNCTION_ARGS)
 		 * First, locally mark the node as inactive. We'll later trigger background
 		 * worker to sync the metadata changes to the relevant nodes.
 		 */
+		bool isActive = false;
 		workerNode =
 			SetWorkerColumnLocalOnly(workerNode,
 									 Anum_pg_dist_node_isactive,
@@ -449,10 +449,11 @@ citus_disable_node(PG_FUNCTION_ARGS)
 
 		if (NodeIsPrimary(workerNode))
 		{
+
 			ErrorIfCoordinatorMetadataSetFalse(workerNode, BoolGetDatum(isActive),
 											   "isactive");
 
-			if (!force)
+			if (!forceDisableNode)
 			{
 				/*
 				 * We do not allow disabling nodes if it contains any
@@ -1353,9 +1354,13 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
  * If the force flag is set to true, even if the node's current state is
  * already hasmetadata && metadataSynced, the background worker is forced
  * to re-write the metadata.
+ *
+ * When forceMetadataSyncToAllNodes is true, this function forces all nodes
+ * to get the new latest metadata irrespective of the state of the node
+ * (e.g., hasMetadata or metadataSynced).
  */
 void
-TriggerSyncMetadataToPrimaryNodes(bool force)
+TriggerSyncMetadataToPrimaryNodes(bool forceMetadataSyncToAllNodes)
 {
 	List *workerList = ActivePrimaryNonCoordinatorNodeList(ShareLock);
 	bool triggerMetadataSync = false;
@@ -1376,15 +1381,15 @@ TriggerSyncMetadataToPrimaryNodes(bool force)
 
 			triggerMetadataSync = true;
 		}
-		else if (!workerNode->metadataSynced)
-		{
-			triggerMetadataSync = true;
-		}
-		else if (force && EnableMetadataSyncByDefault)
+		else if (forceMetadataSyncToAllNodes && EnableMetadataSyncByDefault)
 		{
 			LockRelationOid(DistNodeRelationId(), ExclusiveLock);
 			SetWorkerColumnLocalOnly(workerNode, Anum_pg_dist_node_metadatasynced,
 									 BoolGetDatum(false));
+			triggerMetadataSync = true;
+		}
+		else if (workerNode->hasMetadata && !workerNode->metadataSynced)
+		{
 			triggerMetadataSync = true;
 		}
 	}
