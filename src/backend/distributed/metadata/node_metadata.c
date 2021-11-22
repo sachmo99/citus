@@ -1380,7 +1380,7 @@ TriggerSyncMetadataToPrimaryNodes(bool force)
 		{
 			triggerMetadataSync = true;
 		}
-		else if (force)
+		else if (force && EnableMetadataSyncByDefault)
 		{
 			LockRelationOid(DistNodeRelationId(), ExclusiveLock);
 			SetWorkerColumnLocalOnly(workerNode, Anum_pg_dist_node_metadatasynced,
