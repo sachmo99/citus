@@ -80,7 +80,6 @@ static void UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 										   int *distribution_argument_index,
 										   int *colocationId);
 static void EnsureSequentialModeForFunctionDDL(void);
-static void TriggerSyncMetadataToPrimaryNodes(void);
 static bool ShouldPropagateCreateFunction(CreateFunctionStmt *stmt);
 static bool ShouldPropagateAlterFunction(const ObjectAddress *address);
 static ObjectAddress FunctionToObjectAddress(ObjectType objectType,
@@ -1085,47 +1084,6 @@ EnsureSequentialModeForFunctionDDL(void)
 						 "commands see the type correctly we need to make sure to "
 						 "use only one connection for all future commands")));
 	SetLocalMultiShardModifyModeToSequential();
-}
-
-
-/*
- * TriggerSyncMetadataToPrimaryNodes iterates over the active primary nodes,
- * and triggers the metadata syncs if the node has not the metadata. Later,
- * maintenance daemon will sync the metadata to nodes.
- */
-static void
-TriggerSyncMetadataToPrimaryNodes(void)
-{
-	List *workerList = ActivePrimaryNonCoordinatorNodeList(ShareLock);
-	bool triggerMetadataSync = false;
-
-	WorkerNode *workerNode = NULL;
-	foreach_ptr(workerNode, workerList)
-	{
-		/* if already has metadata, no need to do it again */
-		if (!workerNode->hasMetadata)
-		{
-			/*
-			 * Let the maintanince deamon do the hard work of syncing the metadata. We prefer
-			 * this because otherwise node activation might fail withing transaction blocks.
-			 */
-			LockRelationOid(DistNodeRelationId(), ExclusiveLock);
-			SetWorkerColumnLocalOnly(workerNode, Anum_pg_dist_node_hasmetadata,
-									 BoolGetDatum(true));
-
-			triggerMetadataSync = true;
-		}
-		else if (!workerNode->metadataSynced)
-		{
-			triggerMetadataSync = true;
-		}
-	}
-
-	/* let the maintanince deamon know about the metadata sync */
-	if (triggerMetadataSync)
-	{
-		TriggerMetadataSyncOnCommit();
-	}
 }
 
 
