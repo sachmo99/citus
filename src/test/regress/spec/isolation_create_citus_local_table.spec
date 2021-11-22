@@ -14,7 +14,6 @@ teardown
     DROP SCHEMA IF EXISTS another_schema CASCADE;
     -- remove coordinator only if it is added to pg_dist_node
     SELECT master_remove_node(nodename, nodeport) FROM pg_dist_node WHERE nodeport=57636;
-    SELECT public.wait_until_metadata_sync(30000);
 }
 
 session "s1"
