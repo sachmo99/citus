@@ -20,6 +20,7 @@ teardown
 	DROP TABLE IF EXISTS test_reference_table_2;
 	DROP TABLE IF EXISTS test_table;
 	SELECT master_remove_node(nodename, nodeport) FROM pg_dist_node;
+	SELECT public.wait_until_metadata_sync(30000);
 }
 
 session "s1"
