@@ -395,7 +395,8 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 	bool passAclCheck = false;
 	Oid idToCheck = InvalidOid;
 
-	if (!(SupportedDependencyByCitus(addr)))
+	/* Since we don't handle sequences like object, add it separately */
+	if (!(SupportedDependencyByCitus(addr) || type == OBJECT_SEQUENCE))
 	{
 		ereport(ERROR, (errmsg("Object type %d can not be distributed by Citus", type)));
 	}
