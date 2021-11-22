@@ -602,7 +602,6 @@ MetadataCreateCommands(void)
 			ObjectAddress sequenceAddress = { 0 };
 			ObjectAddressSet(sequenceAddress, RelationRelationId, sequenceOid);
 			EnsureDependenciesExistOnAllNodes(&sequenceAddress);
-			MarkObjectDistributed(&sequenceAddress);
 		}
 
 		SetLocalEnableDependencyCreation(prevDependencyCreationValue);
