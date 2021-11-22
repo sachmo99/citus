@@ -550,25 +550,6 @@ MetadataCreateCommands(void)
 
 		EnsureDependenciesExistOnAllNodes(&tableAddress);
 
-		/*
-		 * Ensure sequence dependencies and mark them as distributed
-		 */
-		List *attnumList = NIL;
-		List *dependentSequenceList = NIL;
-		GetDependentSequencesWithRelation(relationId, &attnumList,
-										  &dependentSequenceList, 0);
-
-		Oid sequenceOid = InvalidOid;
-		foreach_oid(sequenceOid, dependentSequenceList)
-		{
-			ObjectAddress sequenceAddress = { 0 };
-			ObjectAddressSet(sequenceAddress, RelationRelationId, sequenceOid);
-			EnsureDependenciesExistOnAllNodes(&sequenceAddress);
-			MarkObjectDistributed(&sequenceAddress);
-		}
-
-		SetLocalEnableDependencyCreation(prevDependencyCreationValue);
-
 		List *workerSequenceDDLCommands = SequenceDDLCommandsForTable(relationId);
 		metadataSnapshotCommandList = list_concat(metadataSnapshotCommandList,
 												  workerSequenceDDLCommands);
