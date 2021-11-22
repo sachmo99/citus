@@ -113,6 +113,7 @@ static void EnsureLocalTableEmptyIfNecessary(Oid relationId, char distributionMe
 static bool ShouldLocalTableBeEmpty(Oid relationId, char distributionMethod, bool
 									viaDeprecatedAPI);
 static void EnsureCitusTableCanBeCreated(Oid relationOid);
+static void EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid);
 static List * GetFKeyCreationCommandsRelationInvolvedWithTableType(Oid relationId,
 																   int tableTypeFlag);
 static Oid DropFKeysAndUndistributeTable(Oid relationId);
@@ -127,7 +128,6 @@ static void DoCopyFromLocalTableIntoShards(Relation distributedRelation,
 										   TupleTableSlot *slot,
 										   EState *estate);
 static void ErrorIfTemporaryTable(Oid relationId);
-static void EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid);
 
 /* exports for SQL callable functions */
 PG_FUNCTION_INFO_V1(master_create_distributed_table);
@@ -537,7 +537,7 @@ CreateDistributedTable(Oid relationId, Var *distributionColumn, char distributio
 		if (ClusterHasKnownMetadataWorkers())
 		{
 			/*
-			 * Ensure sequence with dependencies and mark them as distributed
+			 * Ensure both sequence and its' dependencies and mark them as distributed
 			 * before creating table metadata on workers
 			 */
 			MarkSequenceListDistributedAndPropagateWithDependencies(relationId,
@@ -713,27 +713,8 @@ EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid)
 {
 	List *sequenceDDLList = NIL;
 	char *ownerName = TableOwner(relationId);
-	char *sequenceDef = pg_get_sequencedef_string(sequenceOid);
-	char *escapedSequenceDef = quote_literal_cstr(sequenceDef);
-	StringInfo wrappedSequenceDef = makeStringInfo();
-	StringInfo sequenceGrantStmt = makeStringInfo();
-	char *sequenceName = generate_qualified_relation_name(sequenceOid);
-	Form_pg_sequence sequenceData = pg_get_sequencedef(sequenceOid);
-	Oid sequenceTypeOid = sequenceData->seqtypid;
-	char *typeName = format_type_be(sequenceTypeOid);
 
-	/* create schema if needed */
-	appendStringInfo(wrappedSequenceDef,
-					 WORKER_APPLY_SEQUENCE_COMMAND,
-					 escapedSequenceDef,
-					 quote_literal_cstr(typeName));
-
-	appendStringInfo(sequenceGrantStmt,
-					 "ALTER SEQUENCE %s OWNER TO %s", sequenceName,
-					 quote_identifier(ownerName));
-
-	sequenceDDLList = lappend(sequenceDDLList, wrappedSequenceDef->data);
-	sequenceDDLList = lappend(sequenceDDLList, sequenceGrantStmt->data);
+	sequenceDDLList = DDLCommandsForSequence(sequenceOid, ownerName);
 
 	/* prevent recursive propagation */
 	SendCommandToWorkersWithMetadata(DISABLE_DDL_PROPAGATION);

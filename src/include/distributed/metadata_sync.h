@@ -56,6 +56,7 @@ extern void SyncMetadataToNodesMain(Datum main_arg);
 extern void SignalMetadataSyncDaemon(Oid database, int sig);
 extern bool ShouldInitiateMetadataSync(bool *lockFailure);
 
+extern List * DDLCommandsForSequence(Oid sequenceOid, char *ownerName);
 extern List * SequenceDDLCommandsForTable(Oid relationId);
 extern List * GetSequencesFromAttrDef(Oid attrdefOid);
 extern void GetDependentSequencesWithRelation(Oid relationId, List **attnumList,

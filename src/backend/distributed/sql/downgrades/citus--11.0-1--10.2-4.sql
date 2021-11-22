@@ -1,7 +1,5 @@
 -- citus--11.0-1--10.2-4
 
-DROP FUNCTION pg_catalog.citus_internal_add_object_metadata(text, text[], text[], integer, integer);
-
 CREATE FUNCTION pg_catalog.master_apply_delete_command(text)
     RETURNS integer
     LANGUAGE C STRICT
@@ -33,3 +31,5 @@ COMMENT ON FUNCTION master_append_table_to_shard(bigint, text, text, integer)
 
 GRANT ALL ON FUNCTION start_metadata_sync_to_node(text, integer) TO PUBLIC;
 GRANT ALL ON FUNCTION stop_metadata_sync_to_node(text, integer,bool) TO PUBLIC;
+
+DROP FUNCTION pg_catalog.citus_internal_add_object_metadata(text, text[], text[], integer, integer);
