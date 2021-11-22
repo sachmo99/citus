@@ -475,6 +475,8 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 			{
 				ereport(ERROR, (errmsg("Only owner of the extension can distribute it")));
 			}
+			passAclCheck = true;
+			break;
 		}
 
 		case OBJECT_COLLATION:

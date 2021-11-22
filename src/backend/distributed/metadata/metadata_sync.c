@@ -707,7 +707,6 @@ MetadataCreateCommands(void)
 static List *
 DistributedObjectSyncCommandList(void)
 {
-	List *commandList = NIL;
 	HeapTuple pgDistObjectTup = NULL;
 	Relation pgDistObjectRel = table_open(DistObjectRelationId(), AccessShareLock);
 	TupleDesc pgDistObjectDesc = RelationGetDescr(pgDistObjectRel);
@@ -770,7 +769,7 @@ DistributedObjectSyncCommandList(void)
 
 	char *workerMetadataUpdateCommand = MarkObjectsDistributedCreateCommand(
 		objectAddresses, distributionArgumentIndexes, colocationIds);
-	commandList = list_make1(workerMetadataUpdateCommand);
+	List *commandList = list_make1(workerMetadataUpdateCommand);
 
 	systable_endscan(pgDistObjectScan);
 	relation_close(pgDistObjectRel, NoLock);

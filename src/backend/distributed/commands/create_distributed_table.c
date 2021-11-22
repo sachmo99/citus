@@ -711,10 +711,8 @@ MarkSequenceDistributedAndPropagateWithDependencies(Oid relationId, Oid sequence
 static void
 EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid)
 {
-	List *sequenceDDLList = NIL;
 	char *ownerName = TableOwner(relationId);
-
-	sequenceDDLList = DDLCommandsForSequence(sequenceOid, ownerName);
+	List *sequenceDDLList = DDLCommandsForSequence(sequenceOid, ownerName);
 
 	/* prevent recursive propagation */
 	SendCommandToWorkersWithMetadata(DISABLE_DDL_PROPAGATION);
