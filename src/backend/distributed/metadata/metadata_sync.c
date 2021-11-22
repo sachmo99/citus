@@ -686,25 +686,49 @@ DistributedObjectSyncCommandList(void)
 		Form_pg_dist_object pg_dist_object = (Form_pg_dist_object) GETSTRUCT(
 			pgDistObjectTup);
 
-		ObjectAddress address;
-		ObjectAddressSubSet(address, pg_dist_object->classid, pg_dist_object->objid,
+		ObjectAddress *address = palloc(sizeof(ObjectAddress));
+		int32 *colocationIdPtr = palloc(sizeof(int32));
+		int32 *distributionArgumentIndexPtr = palloc(sizeof(int32));
+
+		ObjectAddressSubSet(*address, pg_dist_object->classid, pg_dist_object->objid,
 							pg_dist_object->objsubid);
 
-		bool distributionArgumentIndexIsNull = true;
-		int32 distributionArgumentIndex = DatumGetInt32(
-			heap_getattr(pgDistObjectTup, Anum_pg_dist_object_distribution_argument_index,
-						 pgDistObjectDesc, &distributionArgumentIndexIsNull));
+		bool distributionArgumentIndexIsNull = false;
+		Datum distributionArgumentIndexDatum =
+			heap_getattr(pgDistObjectTup,
+						 Anum_pg_dist_object_distribution_argument_index,
+						 pgDistObjectDesc,
+						 &distributionArgumentIndexIsNull);
+		*distributionArgumentIndexPtr = DatumGetInt32(distributionArgumentIndexDatum);
 
-		bool colocationIdIsNull = true;
-		int32 colocationId = DatumGetInt32(
-			heap_getattr(pgDistObjectTup, Anum_pg_dist_object_distribution_argument_index,
-						 pgDistObjectDesc, &colocationIdIsNull));
+		bool colocationIdIsNull = false;
+		Datum colocationIdDatum =
+			heap_getattr(pgDistObjectTup,
+						 Anum_pg_dist_object_distribution_argument_index,
+						 pgDistObjectDesc,
+						 &colocationIdIsNull);
+		*colocationIdPtr = DatumGetInt32(colocationIdDatum);
 
-		objectAddresses = lappend(objectAddresses, &address);
-		distributionArgumentIndexes = lappend(distributionArgumentIndexes,
-											  distributionArgumentIndexIsNull ? NULL :
-											  &distributionArgumentIndex);
-		colocationIds = lappend(colocationIds, colocationIdIsNull ? NULL : &colocationId);
+		objectAddresses = lappend(objectAddresses, address);
+
+		if (distributionArgumentIndexIsNull)
+		{
+			distributionArgumentIndexes = lappend(distributionArgumentIndexes, NULL);
+		}
+		else
+		{
+			distributionArgumentIndexes = lappend(distributionArgumentIndexes,
+												  distributionArgumentIndexPtr);
+		}
+
+		if (colocationIdIsNull)
+		{
+			colocationIds = lappend(colocationIds, NULL);
+		}
+		else
+		{
+			colocationIds = lappend(colocationIds, colocationIdPtr);
+		}
 	}
 
 	char *workerMetadataUpdateCommand = MarkObjectsDistributedCreateCommand(
@@ -712,7 +736,7 @@ DistributedObjectSyncCommandList(void)
 	commandList = lappend(commandList, workerMetadataUpdateCommand);
 
 	systable_endscan(pgDistObjectScan);
-	relation_close(pgDistObjectRel, AccessShareLock);
+	relation_close(pgDistObjectRel, NoLock);
 	return commandList;
 }
 
