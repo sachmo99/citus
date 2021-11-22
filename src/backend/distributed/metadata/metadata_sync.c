@@ -101,7 +101,6 @@ static GrantStmt * GenerateGrantOnSchemaStmtForRights(Oid roleOid,
 													  Oid schemaOid,
 													  char *permission,
 													  bool withGrantOption);
-static void SetLocalEnableDependencyCreation(bool state);
 static char * GenerateSetRoleQuery(Oid roleOid);
 static void MetadataSyncSigTermHandler(SIGNAL_ARGS);
 static void MetadataSyncSigAlrmHandler(SIGNAL_ARGS);
@@ -545,9 +544,6 @@ MetadataCreateCommands(void)
 		 * locally while creating dependencies for sequences. Commands that propagate
 		 * object's metadata will be created at the end of this function.
 		 */
-		bool prevDependencyCreationValue = EnableDependencyCreation;
-		SetLocalEnableDependencyCreation(false);
-
 		EnsureDependenciesExistOnAllNodes(&tableAddress);
 
 		List *workerSequenceDDLCommands = SequenceDDLCommandsForTable(relationId);
@@ -1805,16 +1801,6 @@ GenerateGrantOnSchemaStmtForRights(Oid roleOid,
 }
 
 
-/*
- * SetLocalEnableDependencyCreation sets the enable_object_propagation locally
- */
-static void
-SetLocalEnableDependencyCreation(bool state)
-{
-	set_config_option("citus.enable_object_propagation", state == true ? "on" : "off",
-					  (superuser() ? PGC_SUSET : PGC_USERSET), PGC_S_SESSION,
-					  GUC_ACTION_LOCAL, true, 0, false);
-}
 
 
 static char *
