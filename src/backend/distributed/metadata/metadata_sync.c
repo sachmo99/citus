@@ -602,8 +602,6 @@ MetadataCreateCommands(void)
 			ObjectAddress sequenceAddress = { 0 };
 			ObjectAddressSet(sequenceAddress, RelationRelationId, sequenceOid);
 			EnsureDependenciesExistOnAllNodes(&sequenceAddress);
-			elog(WARNING, "Created sequence info %d, %d, %d", sequenceAddress.classId,
-				 sequenceAddress.objectId, sequenceAddress.objectSubId);
 		}
 
 		SetLocalEnableDependencyCreation(prevDependencyCreationValue);
@@ -616,8 +614,6 @@ MetadataCreateCommands(void)
 		TableDDLCommand *tableDDLCommand = NULL;
 		foreach_ptr(tableDDLCommand, ddlCommandList)
 		{
-			elog(WARNING, "Table creation with ddl command %s",
-				 tableDDLCommand->commandStr);
 			Assert(CitusIsA(tableDDLCommand, TableDDLCommand));
 			metadataSnapshotCommandList = lappend(metadataSnapshotCommandList,
 												  GetTableDDLCommand(tableDDLCommand));
