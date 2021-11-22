@@ -142,8 +142,9 @@ EnsureDependenciesExistOnAllNodes(const ObjectAddress *target)
 	}
 
 	/*
-	 * NOTE: We do this after creating the objects on the workers, otherwise
-	 * MarkObjectDistributed would fail.
+	 * We do this after creating the objects on the workers, we make sure
+	 * that objects have been created on worker nodes before marking them
+	 * distributed, so MarkObjectDistributed wouldn't fail.
 	 */
 	foreach_ptr(dependency, dependenciesWithCommands)
 	{

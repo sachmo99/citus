@@ -6,7 +6,7 @@
  * Since we need to use intermediate data types Relation and Node from
  * the pg_get_object_address, we've copied that function from PG code and
  * added required owner/acl checks for our own purposes.
- * 
+ *
  * We need to make sure that function works with future PG versions. Update
  * the function name according to supported PG versions as well.
  *
@@ -30,7 +30,7 @@
 
 static void ErrorIfCurrentUserCanNotDistributeObject(ObjectType type,
 													 ObjectAddress *addr,
-										 			 Node *node,
+													 Node *node,
 													 Relation *relation);
 static List * textarray_to_strvaluelist(ArrayType *arr);
 
@@ -43,7 +43,7 @@ static List * textarray_to_strvaluelist(ArrayType *arr);
  * PgGetObjectAddress gets the object address. This function is mostly copied from
  * pg_get_object_address of the PG code. We need to copy that function to use
  * intermediate data types Relation and Node to check acl or ownership.
- * 
+ *
  * Codes added by Citus are tagged with CITUS CODE BEGIN/END.
  */
 ObjectAddress
@@ -366,6 +366,7 @@ PgGetObjectAddress(char *ttype, ArrayType *namearr, ArrayType *argsarr)
 
 	/* CITUS CODE BEGIN */
 	ErrorIfCurrentUserCanNotDistributeObject(type, &addr, objnode, &relation);
+
 	/* CITUS CODE END */
 
 	/* We don't need the relcache entry, thank you very much */
@@ -394,10 +395,10 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 	bool passAclCheck = false;
 	Oid idToCheck = InvalidOid;
 
-	if(!(SupportedDependencyByCitus(addr)))
+	if (!(SupportedDependencyByCitus(addr)))
 	{
 		ereport(ERROR, (errmsg("Object type %d can not be distributed by Citus", type)));
-	} 
+	}
 
 	switch (type)
 	{
@@ -406,8 +407,8 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 			if (IsObjectAddressOwnedByExtension(addr, NULL))
 			{
 				ereport(ERROR, (errmsg("Current user does not have required "
-						"access privileges on access method %d with type %d",
-						addr->objectId, type)));
+									   "access privileges on access method %d with type %d",
+									   addr->objectId, type)));
 			}
 			passAclCheck = true;
 			break;
@@ -417,7 +418,7 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		{
 			idToCheck = addr->objectId;
 			aclMaskResult = pg_namespace_aclmask(idToCheck, userId, ACL_USAGE,
-											     ACLMASK_ANY);
+												 ACLMASK_ANY);
 			break;
 		}
 
@@ -445,8 +446,8 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 			if (!(addr->objectId == CitusExtensionOwner()))
 			{
 				ereport(ERROR, (errmsg("Current user does not have required "
-						"access privileges on role %d with type %d",
-						addr->objectId, type)));
+									   "access privileges on role %d with type %d",
+									   addr->objectId, type)));
 			}
 			passAclCheck = true;
 			break;
@@ -485,7 +486,7 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		default:
 		{
 			ereport(ERROR, (errmsg("%d object type is not supported within "
-					"object propagation", type)));
+								   "object propagation", type)));
 			break;
 		}
 	}
@@ -493,7 +494,8 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 	if (passAclCheck == false && aclMaskResult == ACL_NO_RIGHTS)
 	{
 		ereport(ERROR, (errmsg("Current user does not have required privileges "
-				"on %d with type id %d to distribute it", idToCheck, type)));
+							   "on %d with type id %d to distribute it", idToCheck,
+							   type)));
 	}
 }
 
