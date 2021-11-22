@@ -118,6 +118,7 @@ step "s1-add-node"
 step "s1-remove-node"
 {
 	SELECT master_remove_node('localhost', 9999);
+	SELECT public.wait_until_metadata_sync(30000);
 }
 
 step "s1-commit"
