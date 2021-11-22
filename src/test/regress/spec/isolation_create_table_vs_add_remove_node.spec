@@ -26,6 +26,7 @@ step "s1-add-node-2"
 step "s1-remove-node-2"
 {
 	SELECT * FROM master_remove_node('localhost', 57638);
+	SELECT public.wait_until_metadata_sync(30000);
 }
 
 step "s1-abort"

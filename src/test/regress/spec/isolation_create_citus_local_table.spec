@@ -14,6 +14,7 @@ teardown
     DROP SCHEMA IF EXISTS another_schema CASCADE;
     -- remove coordinator only if it is added to pg_dist_node
     SELECT master_remove_node(nodename, nodeport) FROM pg_dist_node WHERE nodeport=57636;
+    SELECT public.wait_until_metadata_sync(30000);
 }
 
 session "s1"
@@ -24,7 +25,7 @@ step "s1-create-citus-local-table-3" { SELECT citus_add_local_table_to_metadata(
 step "s1-drop-table" { DROP TABLE citus_local_table_1; }
 step "s1-delete" { DELETE FROM citus_local_table_1 WHERE a=2; }
 step "s1-select" { SELECT * FROM citus_local_table_1; }
-step "s1-remove-coordinator" { SELECT master_remove_node('localhost', 57636); }
+step "s1-remove-coordinator" { SELECT master_remove_node('localhost', 57636); SELECT public.wait_until_metadata_sync(30000); }
 step "s1-add-coordinator" { SELECT 1 FROM master_add_node('localhost', 57636, 0); }
 step "s1-commit" { COMMIT; }
 step "s1-rollback" { ROLLBACK; }
@@ -39,7 +40,7 @@ step "s2-select" { SELECT * FROM citus_local_table_1; }
 step "s2-update" { UPDATE citus_local_table_1 SET a=1 WHERE a=2; }
 step "s2-truncate" { TRUNCATE citus_local_table_1; }
 step "s2-fkey-to-another" { ALTER TABLE citus_local_table_1 ADD CONSTRAINT fkey_c_to_c FOREIGN KEY(a) REFERENCES citus_local_table_2(a); }
-step "s2-remove-coordinator" { SELECT master_remove_node('localhost', 57636); }
+step "s2-remove-coordinator" { SELECT master_remove_node('localhost', 57636); SELECT public.wait_until_metadata_sync(30000); }
 step "s2-commit" { COMMIT; }
 
 
