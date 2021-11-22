@@ -449,7 +449,6 @@ citus_disable_node(PG_FUNCTION_ARGS)
 
 		if (NodeIsPrimary(workerNode))
 		{
-
 			ErrorIfCoordinatorMetadataSetFalse(workerNode, BoolGetDatum(isActive),
 											   "isactive");
 
@@ -856,14 +855,34 @@ ActivateNode(char *nodeName, int nodePort)
 	/* take an exclusive lock on pg_dist_node to serialize pg_dist_node changes */
 	LockRelationOid(DistNodeRelationId(), ExclusiveLock);
 
-	WorkerNode *newWorkerNode = SetNodeState(nodeName, nodePort, isActive);
+	/*
+	 * First, locally mark the node is active, if everything goes well,
+	 * we are going to sync this information to all the metadata nodes.
+	 */
+	WorkerNode *workerNode = FindWorkerNode(nodeName, nodePort);
+	workerNode =
+		SetWorkerColumnLocalOnly(workerNode, Anum_pg_dist_node_isactive,
+								 BoolGetDatum(isActive));
+	if (EnableMetadataSyncByDefault && NodeIsPrimary(workerNode))
+	{
+		/*
+		 * We are going to sync the metadata anyway in this transaction, so do
+		 * not fail just because the current metadata is not synced.
+		 */
+		SetWorkerColumn(workerNode, Anum_pg_dist_node_metadatasynced,
+						BoolGetDatum(isActive));
+	}
 
-	SetUpDistributedTableDependencies(newWorkerNode);
+	SetUpDistributedTableDependencies(workerNode);
 
-	if (EnableMetadataSyncByDefault && NodeIsPrimary(newWorkerNode))
+	if (EnableMetadataSyncByDefault && NodeIsPrimary(workerNode))
 	{
 		StartMetadataSyncToNode(nodeName, nodePort);
 	}
+
+	/* finally, let all other active metadata nodes to learn about this change */
+	WorkerNode *newWorkerNode = SetNodeState(nodeName, nodePort, isActive);
+	Assert(newWorkerNode->nodeId == workerNode->nodeId);
 
 	return newWorkerNode->nodeId;
 }

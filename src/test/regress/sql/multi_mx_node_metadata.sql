@@ -328,7 +328,7 @@ SELECT wait_until_metadata_sync(30000);
 -- set metadatasynced so we try porpagating metadata changes
 UPDATE pg_dist_node SET metadatasynced = TRUE WHERE nodeid IN (:nodeid_1, :nodeid_2);
 
--- should error out
+-- should not error out as disable node is fault tolerant
 SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
 SELECT wait_until_metadata_sync(30000);
 

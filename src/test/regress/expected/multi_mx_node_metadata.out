@@ -46,7 +46,7 @@ SELECT master_add_node('localhost', :worker_1_port) As nodeid_1 \gset
 SELECT nodeid, nodename, nodeport, hasmetadata, metadatasynced FROM pg_dist_node;
  nodeid | nodename  | nodeport | hasmetadata | metadatasynced
 ---------------------------------------------------------------------
-      2 | localhost |    57637 | f           | f
+      2 | localhost |    57637 | t           | t
 (1 row)
 
 -- create couple of tables
@@ -83,7 +83,7 @@ SELECT 1 FROM master_update_node((SELECT nodeid FROM pg_dist_node),
 SELECT nodeid, nodename, nodeport, hasmetadata, metadatasynced FROM pg_dist_node;
  nodeid | nodename  | nodeport | hasmetadata | metadatasynced
 ---------------------------------------------------------------------
-      2 | localhost |    57638 | f           | f
+      2 | localhost |    57638 | t           | f
 (1 row)
 
 -- start syncing metadata to the node
@@ -763,7 +763,7 @@ SELECT wait_until_metadata_sync(30000);
 
 -- set metadatasynced so we try porpagating metadata changes
 UPDATE pg_dist_node SET metadatasynced = TRUE WHERE nodeid IN (:nodeid_1, :nodeid_2);
--- should error out
+-- should not error out as disable node is fault tolerant
 SELECT 1 FROM master_disable_node('localhost', :worker_2_port);
  ?column?
 ---------------------------------------------------------------------
