@@ -716,15 +716,19 @@ DistributedObjectSyncCommandList(void)
 {
 	HeapTuple pgDistObjectTup = NULL;
 	Relation pgDistObjectRel = table_open(DistObjectRelationId(), AccessShareLock);
+	Relation pgDistObjectIndexRel = index_open(DistObjectPrimaryKeyIndexId(),
+											   AccessShareLock);
 	TupleDesc pgDistObjectDesc = RelationGetDescr(pgDistObjectRel);
 
 	List *objectAddresses = NIL;
 	List *distributionArgumentIndexes = NIL;
 	List *colocationIds = NIL;
 
-	SysScanDesc pgDistObjectScan = systable_beginscan(pgDistObjectRel, InvalidOid, false,
-													  NULL, 0, NULL);
-	while (HeapTupleIsValid(pgDistObjectTup = systable_getnext(pgDistObjectScan)))
+	SysScanDesc pgDistObjectScan = systable_beginscan_ordered(pgDistObjectRel,
+															  pgDistObjectIndexRel, NULL,
+															  0, NULL);
+	while (HeapTupleIsValid(pgDistObjectTup = systable_getnext_ordered(pgDistObjectScan,
+																	   ForwardScanDirection)))
 	{
 		Form_pg_dist_object pg_dist_object = (Form_pg_dist_object) GETSTRUCT(
 			pgDistObjectTup);
@@ -778,7 +782,8 @@ DistributedObjectSyncCommandList(void)
 		objectAddresses, distributionArgumentIndexes, colocationIds);
 	List *commandList = list_make1(workerMetadataUpdateCommand);
 
-	systable_endscan(pgDistObjectScan);
+	systable_endscan_ordered(pgDistObjectScan);
+	index_close(pgDistObjectIndexRel, AccessShareLock);
 	relation_close(pgDistObjectRel, NoLock);
 	return commandList;
 }
