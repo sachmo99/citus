@@ -415,9 +415,8 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		case OBJECT_PROCEDURE:
 		case OBJECT_AGGREGATE:
 		{
-			idToCheck = addr->objectId;
-			aclMaskResult = pg_proc_aclmask(idToCheck, userId, ACL_EXECUTE,
-											ACLMASK_ANY);
+			check_object_ownership(userId, type, *addr, node, *relation);
+			skipAclCheck = true;
 			break;
 		}
 
@@ -451,6 +450,12 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		}
 
 		case OBJECT_SEQUENCE:
+		{
+			idToCheck = addr->objectId;
+			aclMaskResult = pg_class_aclmask(idToCheck, userId, ACL_USAGE, ACLMASK_ANY);
+			break;
+		}
+
 		case OBJECT_TABLE:
 		{
 			/* table distribution already does the ownership check, so we can stick to that over acl_check */
