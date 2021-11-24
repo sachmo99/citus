@@ -273,6 +273,7 @@ SET search_path TO multi_mx_function_call_delegation, public;
 select create_distributed_function('mx_call_func(int,int)');
 
 -- show that we can call delegated function from worker nodes
+SET client_min_messages TO DEBUG1;
 SELECT delegated_function(100);
 
 \c - - - :master_port

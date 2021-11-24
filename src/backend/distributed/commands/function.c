@@ -641,12 +641,12 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 	if (EnableDependencyCreation)
 	{
 		/* create a list by adding the address of value to not to have warning */
-		List *addresses = NIL;
+		List *objectAddressList = NIL;
 		ObjectAddress addressToUse = *distAddress;
-		addresses = lappend(addresses, &addressToUse);
+		objectAddressList = lappend(objectAddressList, &addressToUse);
 
 		char *workerPgDistObjectUpdateCommand = MarkObjectsDistributedCreateCommand(
-			addresses, list_make1(distribution_argument_index), list_make1(
+			objectAddressList, list_make1(distribution_argument_index), list_make1(
 				colocationId));
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}

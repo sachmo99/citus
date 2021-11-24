@@ -84,7 +84,7 @@ char *EnableManualMetadataChangesForUser = "";
 
 
 static void EnsureSequentialModeMetadataOperations(void);
-static List * DistributedObjectSyncCommandList(void);
+static List * DistributedObjectMetadataSyncCommandList(void);
 static List * GetDistributedTableDDLEvents(Oid relationId);
 static char * LocalGroupIdUpdateCommand(int32 groupId);
 static List * SequenceDependencyCommandList(Oid relationId);
@@ -579,9 +579,8 @@ MetadataCreateCommands(void)
 		ObjectAddressSet(tableAddress, RelationRelationId, relationId);
 
 		/*
-		 * Since we might have unsynced metadata workers here, mark objects distributed
-		 * locally while creating dependencies for sequences. Commands that propagate
-		 * object's metadata will be created at the end of this function.
+		 * Set object propagation to off as we will mark objects distributed
+		 * at the end of this function.
 		 */
 		bool prevDependencyCreationValue = EnableDependencyCreation;
 		SetLocalEnableDependencyCreation(false);
@@ -699,7 +698,7 @@ MetadataCreateCommands(void)
 	}
 
 	/* As the last step, propagate the pg_dist_object entities */
-	List *distributedObjectSyncCommandList = DistributedObjectSyncCommandList();
+	List *distributedObjectSyncCommandList = DistributedObjectMetadataSyncCommandList();
 	metadataSnapshotCommandList = list_concat(metadataSnapshotCommandList,
 											  distributedObjectSyncCommandList);
 
@@ -708,11 +707,11 @@ MetadataCreateCommands(void)
 
 
 /*
- * DistributedObjectSyncCommandList returns the necessary commands to create
+ * DistributedObjectMetadataSyncCommandList returns the necessary commands to create
  * pg_dist_object entries on the new node.
  */
 static List *
-DistributedObjectSyncCommandList(void)
+DistributedObjectMetadataSyncCommandList(void)
 {
 	HeapTuple pgDistObjectTup = NULL;
 	Relation pgDistObjectRel = table_open(DistObjectRelationId(), AccessShareLock);
@@ -778,13 +777,14 @@ DistributedObjectSyncCommandList(void)
 		}
 	}
 
+	systable_endscan_ordered(pgDistObjectScan);
+	index_close(pgDistObjectIndexRel, AccessShareLock);
+	relation_close(pgDistObjectRel, NoLock);
+
 	char *workerMetadataUpdateCommand = MarkObjectsDistributedCreateCommand(
 		objectAddresses, distributionArgumentIndexes, colocationIds);
 	List *commandList = list_make1(workerMetadataUpdateCommand);
 
-	systable_endscan_ordered(pgDistObjectScan);
-	index_close(pgDistObjectIndexRel, AccessShareLock);
-	relation_close(pgDistObjectRel, NoLock);
 	return commandList;
 }
 
@@ -1107,6 +1107,7 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 		EnsureCoordinatorInitiatedOperation();
 	}
 
+	/* We check the acl/ownership while getting the object address */
 	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray,
 													 argsArray);
 

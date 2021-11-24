@@ -392,7 +392,7 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 {
 	Oid userId = GetUserId();
 	AclMode aclMaskResult = 0;
-	bool passAclCheck = false;
+	bool skipAclCheck = false;
 	Oid idToCheck = InvalidOid;
 
 	/* Since we don't handle sequences like object, add it separately */
@@ -403,18 +403,6 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 
 	switch (type)
 	{
-		case OBJECT_ACCESS_METHOD:
-		{
-			if (IsObjectAddressOwnedByExtension(addr, NULL))
-			{
-				ereport(ERROR, (errmsg("Current user does not have required "
-									   "access privileges on access method %d with type %d",
-									   addr->objectId, type)));
-			}
-			passAclCheck = true;
-			break;
-		}
-
 		case OBJECT_SCHEMA:
 		{
 			idToCheck = addr->objectId;
@@ -436,7 +424,7 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		case OBJECT_DATABASE:
 		{
 			idToCheck = addr->objectId;
-			aclMaskResult = pg_database_aclmask(idToCheck, userId, ACL_CONNECT,
+			aclMaskResult = pg_database_aclmask(idToCheck, userId, ACL_CREATE,
 												ACLMASK_ANY);
 			break;
 		}
@@ -444,13 +432,13 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		case OBJECT_ROLE:
 		{
 			/* Support only extension owner role with community */
-			if (!(addr->objectId == CitusExtensionOwner()))
+			if (addr->objectId != CitusExtensionOwner())
 			{
 				ereport(ERROR, (errmsg("Current user does not have required "
 									   "access privileges on role %d with type %d",
 									   addr->objectId, type)));
 			}
-			passAclCheck = true;
+			skipAclCheck = true;
 			break;
 		}
 
@@ -465,24 +453,23 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		case OBJECT_SEQUENCE:
 		case OBJECT_TABLE:
 		{
+			/* table distribution already does the ownership check, so we can stick to that over acl_check */
 			check_object_ownership(userId, type, *addr, node, *relation);
-			passAclCheck = true;
+			skipAclCheck = true;
 			break;
 		}
 
 		case OBJECT_EXTENSION:
 		{
-			if (userId != CitusExtensionOwner())
-			{
-				ereport(ERROR, (errmsg("Only owner of the extension can distribute it")));
-			}
-			passAclCheck = true;
+			/* as of PG 14, only super users can create extension */
+			EnsureSuperUser();
+			skipAclCheck = true;
 			break;
 		}
 
 		case OBJECT_COLLATION:
 		{
-			passAclCheck = true;
+			skipAclCheck = true;
 			break;
 		}
 
@@ -494,7 +481,7 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		}
 	}
 
-	if (passAclCheck == false && aclMaskResult == ACL_NO_RIGHTS)
+	if (!skipAclCheck && aclMaskResult == ACL_NO_RIGHTS)
 	{
 		ereport(ERROR, (errmsg("Current user does not have required privileges "
 							   "on %d with type id %d to distribute it", idToCheck,

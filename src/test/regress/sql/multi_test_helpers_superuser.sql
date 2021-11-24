@@ -31,7 +31,7 @@ WITH dist_node_summary AS (
                             ARRAY[dist_placement_summary.query, dist_placement_summary.query],
                             false)
 ), dist_object_summary AS (
-    SELECT 'SELECT jsonb_agg(ROW(classid, objid, objsubid, distribution_argument_index, colocationid) ORDER BY classid, objid, objsubid) FROM pg_dist_object' AS query
+    SELECT 'SELECT jsonb_agg(ROW(classid, objid, objsubid, distribution_argument_index, colocationid) ORDER BY classid, objid, objsubid) FROM citus.pg_dist_object' AS query
 ), dist_object_check AS (
     SELECT count(distinct result) = 1 AS matches
     FROM dist_object_summary CROSS JOIN LATERAL
