@@ -103,6 +103,15 @@ EnsureDependenciesExistOnAllNodes(const ObjectAddress *target)
 						   dependency->objectSubId, ExclusiveLock);
 	}
 
+	/*
+	 * collect and connect to all applicable nodes
+	 */
+	if (list_length(workerNodeList) <= 0)
+	{
+		/* no nodes to execute on */
+		return;
+	}
+
 	WorkerNode *workerNode = NULL;
 	foreach_ptr(workerNode, workerNodeList)
 	{
