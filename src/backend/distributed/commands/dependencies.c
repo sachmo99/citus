@@ -103,33 +103,6 @@ EnsureDependenciesExistOnAllNodes(const ObjectAddress *target)
 						   dependency->objectSubId, ExclusiveLock);
 	}
 
-	/*
-	 * right after we acquired the lock we mark our objects as distributed, these changes
-	 * will not become visible before we have successfully created all the objects on our
-	 * workers.
-	 *
-	 * It is possible to create distributed tables which depend on other dependencies
-	 * before any node is in the cluster. If we would wait till we actually had connected
-	 * to the nodes before marking the objects as distributed these objects would never be
-	 * created on the workers when they get added, causing shards to fail to create.
-	 */
-	if (list_length(workerNodeList) <= 0)
-	{
-		/* no nodes to execute on */
-		return;
-	}
-
-	/*
-	 * Lock dependent objects explicitly to make sure same DDL command won't be sent
-	 * multiple times from parallel sessions.
-	 */
-	foreach_ptr(dependency, dependenciesWithCommands)
-	{
-		LockDatabaseObject(dependency->classId, dependency->objectId,
-						   dependency->objectSubId, ExclusiveLock);
-	}
-
-
 	WorkerNode *workerNode = NULL;
 	foreach_ptr(workerNode, workerNodeList)
 	{
