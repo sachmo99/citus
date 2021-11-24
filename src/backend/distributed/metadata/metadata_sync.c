@@ -569,8 +569,8 @@ MetadataCreateCommands(void)
 		 * table via multiple sessions these objects will be created via their own connection
 		 * and committed immediately so they become visible to all sessions creating shards.
 		 */
-		ObjectAddressSet(tableAddress, RelationRelationId, relationId);
-		EnsureDependenciesExistOnAllNodes(&tableAddress);
+		//ObjectAddressSet(tableAddress, RelationRelationId, relationId);
+		//EnsureDependenciesExistOnAllNodes(&tableAddress);
 
 		/*
 		 * Ensure sequence dependencies and mark them as distributed
