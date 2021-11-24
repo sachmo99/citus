@@ -424,7 +424,7 @@ ErrorIfCurrentUserCanNotDistributeObject(ObjectType type, ObjectAddress *addr,
 		case OBJECT_DATABASE:
 		{
 			idToCheck = addr->objectId;
-			aclMaskResult = pg_database_aclmask(idToCheck, userId, ACL_CREATE,
+			aclMaskResult = pg_database_aclmask(idToCheck, userId, ACL_CONNECT,
 												ACLMASK_ANY);
 			break;
 		}
