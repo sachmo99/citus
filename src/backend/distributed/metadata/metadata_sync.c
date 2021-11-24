@@ -723,6 +723,7 @@ DistributedObjectMetadataSyncCommandList(void)
 	List *distributionArgumentIndexes = NIL;
 	List *colocationIds = NIL;
 
+	/* For consistent test results use ordered scan */
 	SysScanDesc pgDistObjectScan = systable_beginscan_ordered(pgDistObjectRel,
 															  pgDistObjectIndexRel, NULL,
 															  0, NULL);
