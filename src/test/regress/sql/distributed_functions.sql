@@ -213,7 +213,7 @@ END;
 SELECT create_distributed_function('dup(macaddr)', '$1', colocate_with := 'streaming_table');
 SELECT * FROM run_command_on_workers($$SELECT function_tests.dup('0123456789ab');$$) ORDER BY 1,2;
 
-SELECT public.wait_until_metadata_sync(300);
+SELECT public.wait_until_metadata_sync(30000);
 
 SELECT create_distributed_function('eq(macaddr,macaddr)', '$1', colocate_with := 'streaming_table');
 SELECT * FROM run_command_on_workers($$SELECT function_tests.eq('012345689ab','0123456789ab');$$) ORDER BY 1,2;
@@ -384,7 +384,7 @@ CREATE TABLE replicated_table_func_test (a macaddr);
 SELECT create_distributed_table('replicated_table_func_test', 'a');
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', '$1', colocate_with:='replicated_table_func_test');
 
-SELECT public.wait_until_metadata_sync(300);
+SELECT public.wait_until_metadata_sync(30000);
 
 -- a function can be colocated with a different distribution argument type
 -- as long as there is a coercion path
@@ -453,7 +453,7 @@ SET citus.shard_count TO 55;
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', 'val1');
 
 -- sync metadata to workers for consistent results when clearing objects
-SELECT public.wait_until_metadata_sync(300);
+SELECT public.wait_until_metadata_sync(30000);
 
 
 SET citus.shard_replication_factor TO 1;
