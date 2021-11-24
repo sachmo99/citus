@@ -719,9 +719,9 @@ DistributedObjectMetadataSyncCommandList(void)
 											   AccessShareLock);
 	TupleDesc pgDistObjectDesc = RelationGetDescr(pgDistObjectRel);
 
-	List *objectAddresses = NIL;
-	List *distributionArgumentIndexes = NIL;
-	List *colocationIds = NIL;
+	List *objectAddressList = NIL;
+	List *distributionArgumentIndexList = NIL;
+	List *colocationIdList = NIL;
 
 	/* For consistent test results use ordered scan */
 	SysScanDesc pgDistObjectScan = systable_beginscan_ordered(pgDistObjectRel,
@@ -756,25 +756,25 @@ DistributedObjectMetadataSyncCommandList(void)
 						 &colocationIdIsNull);
 		*colocationIdPtr = DatumGetInt32(colocationIdDatum);
 
-		objectAddresses = lappend(objectAddresses, address);
+		objectAddressList = lappend(objectAddressList, address);
 
 		if (distributionArgumentIndexIsNull)
 		{
-			distributionArgumentIndexes = lappend(distributionArgumentIndexes, NULL);
+			distributionArgumentIndexList = lappend(distributionArgumentIndexList, NULL);
 		}
 		else
 		{
-			distributionArgumentIndexes = lappend(distributionArgumentIndexes,
-												  distributionArgumentIndexPtr);
+			distributionArgumentIndexList = lappend(distributionArgumentIndexList,
+													distributionArgumentIndexPtr);
 		}
 
 		if (colocationIdIsNull)
 		{
-			colocationIds = lappend(colocationIds, NULL);
+			colocationIdList = lappend(colocationIdList, NULL);
 		}
 		else
 		{
-			colocationIds = lappend(colocationIds, colocationIdPtr);
+			colocationIdList = lappend(colocationIdList, colocationIdPtr);
 		}
 	}
 
@@ -782,8 +782,10 @@ DistributedObjectMetadataSyncCommandList(void)
 	index_close(pgDistObjectIndexRel, AccessShareLock);
 	relation_close(pgDistObjectRel, NoLock);
 
-	char *workerMetadataUpdateCommand = MarkObjectsDistributedCreateCommand(
-		objectAddresses, distributionArgumentIndexes, colocationIds);
+	char *workerMetadataUpdateCommand =
+		MarkObjectsDistributedCreateCommand(objectAddressList,
+											distributionArgumentIndexList,
+											colocationIdList);
 	List *commandList = list_make1(workerMetadataUpdateCommand);
 
 	return commandList;
@@ -1086,20 +1088,16 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	char *textType = TextDatumGetCString(PG_GETARG_DATUM(0));
 	ArrayType *nameArray = PG_GETARG_ARRAYTYPE_P(1);
 	ArrayType *argsArray = PG_GETARG_ARRAYTYPE_P(2);
-	int distributionArgumentIndexValue;
-	int colocationIdValue;
-	int *colocationId = NULL;
-	int *distributionArgumentIndex = NULL;
+	int distributionArgumentIndex = INVALID_DISTRIBUTION_ARGUMENT_INDEX;
+	int colocationId = INVALID_COLOCATION_ID;
 
 	if (!PG_ARGISNULL(3))
 	{
-		distributionArgumentIndexValue = PG_GETARG_INT32(3);
-		distributionArgumentIndex = &distributionArgumentIndexValue;
+		distributionArgumentIndex = PG_GETARG_INT32(3);
 	}
 	if (!PG_ARGISNULL(4))
 	{
-		colocationIdValue = PG_GETARG_INT32(4);
-		colocationId = &colocationIdValue;
+		colocationId = PG_GETARG_INT32(4);
 	}
 
 	if (!ShouldSkipMetadataChecks())
@@ -1117,10 +1115,16 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	SetLocalEnableDependencyCreation(false);
 
 	MarkObjectDistributed(&objectAddress);
-	if (colocationId != NULL && distributionArgumentIndex != NULL)
+	if (colocationId != INVALID_COLOCATION_ID && distributionArgumentIndex !=
+		INVALID_DISTRIBUTION_ARGUMENT_INDEX)
 	{
-		UpdateFunctionDistributionInfo(&objectAddress, distributionArgumentIndex,
-									   colocationId);
+		UpdateFunctionDistributionInfo(&objectAddress,
+									   &distributionArgumentIndex,
+									   &colocationId);
+	}
+	else
+	{
+		UpdateFunctionDistributionInfo(&objectAddress, NULL, NULL);
 	}
 
 	SetLocalEnableDependencyCreation(prevDependencyCreationValue);

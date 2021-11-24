@@ -273,9 +273,8 @@ SET search_path TO multi_mx_function_call_delegation, public;
 select create_distributed_function('mx_call_func(int,int)');
 
 -- show that we can call delegated function from worker nodes
-SET citus.worker_min_messages to debug4;
 SET citus.log_remote_commands to true;
-SELECT delegated_function(100);
+SELECT delegated_function(101);
 
 \c - - - :master_port
 SET search_path TO multi_mx_function_call_delegation, public;
