@@ -112,3 +112,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STRICT IMMUTABLE;
 
+SELECT worker_create_or_replace_object('CREATE AGGREGATE proc_conflict.existing_agg(integer) (STYPE = integer,SFUNC = proc_conflict.existing_func2)');
+SELECT worker_create_or_replace_object('CREATE AGGREGATE proc_conflict.existing_agg(integer) (STYPE = integer,SFUNC = proc_conflict.existing_func2)');
+
+-- hide cascades
+SET client_min_messages TO error;
+DROP SCHEMA proc_conflict CASCADE;
+

@@ -1700,11 +1700,131 @@ NOTICE:  executing the command locally: SELECT key, ser, ts, collection_id, valu
 
 COMMIT;
 TRUNCATE collections_list;
--- Show that altering sequences is not working from worker node
+-- make sure that even if local execution is used, the sequence values
+-- are generated locally
+SET citus.enable_ddl_propagation TO OFF;
 ALTER SEQUENCE collections_list_key_seq NO MINVALUE NO MAXVALUE;
-ERROR:  Altering a distributed sequence is currently not supported.
+RESET citus.enable_ddl_propagation;
+PREPARE serial_prepared_local AS INSERT INTO collections_list (collection_id) VALUES (0) RETURNING key, ser;
+SELECT setval('collections_list_key_seq', 4);
+ setval
+---------------------------------------------------------------------
+      4
+(1 row)
+
+EXECUTE serial_prepared_local;
+NOTICE:  executing the command locally: INSERT INTO local_shard_execution.collections_list_1470009 (key, ser, collection_id) VALUES ('5'::bigint, '3940649673949187'::bigint, 0) RETURNING key, ser
+ key |       ser
+-----+------------------
+   5 | 3940649673949187
+(1 row)
+
+SELECT setval('collections_list_key_seq', 5);
+ setval 
+--------
+      5
+(1 row)
+
+EXECUTE serial_prepared_local;
+NOTICE:  executing the command locally: INSERT INTO local_shard_execution.collections_list_1470011 (key, ser, collection_id) VALUES ('6'::bigint, '3940649673949188'::bigint, 0) RETURNING key, ser
+ key |       ser        
+-----+------------------
+   6 | 3940649673949188
+(1 row)
+
+SELECT setval('collections_list_key_seq', 499);
+ setval 
+--------
+    499
+(1 row)
+
+EXECUTE serial_prepared_local;
+NOTICE:  executing the command locally: INSERT INTO local_shard_execution.collections_list_1470011 (key, ser, collection_id) VALUES ('500'::bigint, '3940649673949189'::bigint, 0) RETURNING key, ser
+ key |       ser        
+-----+------------------
+ 500 | 3940649673949189
+(1 row)
+
+SELECT setval('collections_list_key_seq', 700);
+ setval 
+--------
+    700
+(1 row)
+
+EXECUTE serial_prepared_local;
+NOTICE:  executing the command locally: INSERT INTO local_shard_execution.collections_list_1470009 (key, ser, collection_id) VALUES ('701'::bigint, '3940649673949190'::bigint, 0) RETURNING key, ser
+ key |       ser        
+-----+------------------
+ 701 | 3940649673949190
+(1 row)
+
+SELECT setval('collections_list_key_seq', 708);
+ setval 
+--------
+    708
+(1 row)
+
+EXECUTE serial_prepared_local;
+NOTICE:  executing the command locally: INSERT INTO local_shard_execution.collections_list_1470011 (key, ser, collection_id) VALUES ('709'::bigint, '3940649673949191'::bigint, 0) RETURNING key, ser
+ key |       ser        
+-----+------------------
+ 709 | 3940649673949191
+(1 row)
+
+SELECT setval('collections_list_key_seq', 709);
+ setval 
+--------
+    709
+(1 row)
+
+EXECUTE serial_prepared_local;
+NOTICE:  executing the command locally: INSERT INTO local_shard_execution.collections_list_1470009 (key, ser, collection_id) VALUES ('710'::bigint, '3940649673949192'::bigint, 0) RETURNING key, ser
+ key |       ser        
+-----+------------------
+ 710 | 3940649673949192
+(1 row)
+
 -- get ready for the next executions
 DELETE FROM collections_list WHERE key IN (5,6);
+SELECT setval('collections_list_key_seq', 4);
+ setval 
+--------
+      4
+(1 row)
+
+EXECUTE serial_prepared_local;
+NOTICE:  executing the command locally: INSERT INTO local_shard_execution.collections_list_1470009 (key, ser, collection_id) VALUES ('5'::bigint, '3940649673949193'::bigint, 0) RETURNING key, ser
+ key |       ser        
+-----+------------------
+   5 | 3940649673949193
+(1 row)
+
+SELECT setval('collections_list_key_seq', 5);
+ setval 
+--------
+      5
+(1 row)
+
+EXECUTE serial_prepared_local;
+NOTICE:  executing the command locally: INSERT INTO local_shard_execution.collections_list_1470011 (key, ser, collection_id) VALUES ('6'::bigint, '3940649673949194'::bigint, 0) RETURNING key, ser
+ key |       ser        
+-----+------------------
+   6 | 3940649673949194
+(1 row)
+
+-- and, one remote test
+SELECT setval('collections_list_key_seq', 10);
+ setval 
+--------
+     10
+(1 row)
+
+EXECUTE serial_prepared_local;
+ key |       ser        
+-----+------------------
+  11 | 3940649673949195
+(1 row)
+
 -- the final queries for the following CTEs are going to happen on the intermediate results only
 -- one of them will be executed remotely, and the other is locally
 -- Citus currently doesn't allow using task_assignment_policy for intermediate results

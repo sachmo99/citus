@@ -723,7 +723,24 @@ select create_distributed_function('mx_call_func(int,int)');
 ERROR:  operation is not allowed on this node
 HINT:  Connect to the coordinator and run it again.
 -- show that we can call delegated function from worker nodes
+SET citus.worker_min_messages to debug4;
+SET citus.log_remote_commands to true;
 SELECT delegated_function(100);
+NOTICE:  executing the command locally: INSERT INTO multi_mx_function_call_delegation.test_535077 (x) VALUES (100)
+CONTEXT:  SQL statement "INSERT INTO multi_mx_function_call_delegation.test VALUES (a)"
+PL/pgSQL function delegated_function(integer) line 4 at SQL statement
+NOTICE:  issuing BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;SELECT assign_distributed_transaction_id(14, 188, '2021-11-24 06:23:39.640658-08');
+DETAIL:  on server postgres@localhost:57638 connectionId: 1
+CONTEXT:  SQL statement "INSERT INTO multi_mx_function_call_delegation.test VALUES (a + 1)"
+PL/pgSQL function delegated_function(integer) line 5 at SQL statement
+NOTICE:  issuing INSERT INTO multi_mx_function_call_delegation.test_535076 (x) VALUES (101)
+DETAIL:  on server postgres@localhost:57638 connectionId: 1
+CONTEXT:  SQL statement "INSERT INTO multi_mx_function_call_delegation.test VALUES (a + 1)"
+PL/pgSQL function delegated_function(integer) line 5 at SQL statement
+NOTICE:  issuing PREPARE TRANSACTION 'citus_14_4564_188_0'
+DETAIL:  on server postgres@localhost:57638 connectionId: 1
+NOTICE:  issuing COMMIT PREPARED 'citus_14_4564_188_0'
+DETAIL:  on server postgres@localhost:57638 connectionId: 1
  delegated_function
 ---------------------------------------------------------------------
                 102

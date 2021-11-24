@@ -33,17 +33,9 @@ WITH dist_node_summary AS (
         master_run_on_worker(ARRAY[hostname, 'localhost'], ARRAY[port, master_port],
                             ARRAY[dist_placement_summary.query, dist_placement_summary.query],
                             false)
-), dist_object_summary AS (
-    SELECT 'SELECT jsonb_agg(ROW(classid, objid, objsubid, distribution_argument_index, colocationid) ORDER BY classid, objid, objsubid) FROM citus.pg_dist_object' AS query
-), dist_object_check AS (
-    SELECT count(distinct result) = 1 AS matches
-    FROM dist_object_summary CROSS JOIN LATERAL
-        master_run_on_worker(ARRAY[hostname, 'localhost'], ARRAY[port, master_port],
-                            ARRAY[dist_object_summary.query, dist_object_summary.query],
-                            false)
 )
-SELECT dist_node_check.matches AND dist_placement_check.matches AND dist_object_check.matches
-FROM dist_node_check CROSS JOIN dist_placement_check CROSS JOIN dist_object_check
+SELECT dist_node_check.matches AND dist_placement_check.matches
+FROM dist_node_check CROSS JOIN dist_placement_check
 $$;
 -- partition_task_list_results tests the internal PartitionTasklistResults function
 CREATE OR REPLACE FUNCTION pg_catalog.partition_task_list_results(resultIdPrefix text,

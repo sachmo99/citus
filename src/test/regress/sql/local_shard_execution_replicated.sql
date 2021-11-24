@@ -814,9 +814,6 @@ EXECUTE serial_prepared_local;
 SELECT setval('collections_list_key_seq', 10);
 EXECUTE serial_prepared_local;
 
--- get ready for the next executions
-DELETE FROM collections_list WHERE key IN (5,6);
-
 -- the final queries for the following CTEs are going to happen on the intermediate results only
 -- one of them will be executed remotely, and the other is locally
 -- Citus currently doesn't allow using task_assignment_policy for intermediate results
