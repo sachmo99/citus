@@ -284,7 +284,7 @@ static DistributeObjectOps ForeignServer_Drop = {
 	.address = NULL,
 };
 static DistributeObjectOps ForeignServer_Rename = {
-	.deparse = NULL,
+	.deparse = DeparseAlterForeignServerRenameStmt,
 	.qualify = NULL,
 	.preprocess = PreprocessRenameForeignServerStmt,
 	.postprocess = NULL,
