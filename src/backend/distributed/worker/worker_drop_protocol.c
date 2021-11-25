@@ -83,9 +83,9 @@ worker_drop_distributed_table(PG_FUNCTION_ARGS)
 
 	/* Drop dependent sequences from pg_dist_object */
 	#if PG_VERSION_NUM >= PG_VERSION_13
-		List *ownedSequences = getOwnedSequences(relationId);
+	List *ownedSequences = getOwnedSequences(relationId);
 	#else
-		List *ownedSequences = getOwnedSequences(relationId, InvalidAttrNumber);
+	List *ownedSequences = getOwnedSequences(relationId, InvalidAttrNumber);
 	#endif
 
 	Oid ownedSequenceOid = InvalidOid;

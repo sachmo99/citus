@@ -86,7 +86,7 @@ SET ROLE test_user;
 SET search_path TO local_schema;
 
 -- ensure we can load data
-INSERT INTO dist_table VALUES (1, 'sad', (1,'onder')::test_type), 
+INSERT INTO dist_table VALUES (1, 'sad', (1,'onder')::test_type),
 							  (2, 'ok', (1,'burak')::test_type),
 							  (3, 'happy', (1,'marco')::test_type);
 
