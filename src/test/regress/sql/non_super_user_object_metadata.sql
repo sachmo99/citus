@@ -3,6 +3,8 @@ SET citus.enable_ddl_propagation TO OFF;
 CREATE SCHEMA local_schema;
 SET search_path TO local_schema;
 
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+
 -- Create type and function that depends on it
 CREATE TYPE test_type AS (f1 int, f2 text);
 CREATE FUNCTION test_function(int) RETURNS test_type
@@ -21,13 +23,13 @@ SELECT pg_identify_object_as_address(classid, objid, objsubid) from citus.pg_dis
 SELECT pg_identify_object_as_address(classid, objid, objsubid) from citus.pg_dist_object where objid = 'local_schema.test_function'::regproc::oid;
 
 SET client_min_messages TO ERROR;
-CREATE USER test_user;
-SELECT run_command_on_workers($$CREATE USER test_user;$$);
+CREATE USER non_super_user_test_user;
+SELECT run_command_on_workers($$CREATE USER non_super_user_test_user;$$);
 RESET client_min_messages;
 
-GRANT ALL ON SCHEMA local_schema TO test_user;
+GRANT ALL ON SCHEMA local_schema TO non_super_user_test_user;
 
-SET ROLE test_user;
+SET ROLE non_super_user_test_user;
 SET search_path TO local_schema;
 CREATE TABLE dist_table(a int, b mood, c test_type, d int DEFAULT nextval('test_sequence'), e bigserial);
 
@@ -40,11 +42,10 @@ SELECT create_distributed_function('test_function(int)');
 
 RESET ROLE;
 SET search_path TO local_schema;
-ALTER SEQUENCE test_sequence OWNER TO test_user;
-ALTER FUNCTION test_function(int) OWNER TO test_user;
-SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+ALTER SEQUENCE test_sequence OWNER TO non_super_user_test_user;
+ALTER FUNCTION test_function(int) OWNER TO non_super_user_test_user;
 
-SET ROLE test_user;
+SET ROLE non_super_user_test_user;
 SET search_path TO local_schema;
 
 -- Show that we can distribute table and function after
@@ -78,11 +79,11 @@ SELECT run_command_on_workers($$SELECT rolname FROM pg_roles JOIN pg_namespace O
 SELECT DISTINCT(rolname) FROM pg_roles JOIN pg_type ON(pg_type.typowner = pg_roles.oid) WHERE typname IN ('test_type', 'mood');
 SELECT run_command_on_workers($$SELECT DISTINCT(rolname) FROM pg_roles JOIN pg_type ON(pg_type.typowner = pg_roles.oid) WHERE typname IN ('test_type', 'mood');$$);
 
--- show that table is owned by the test_user
+-- show that table is owned by the non_super_user_test_user
 SELECT rolname FROM pg_roles JOIN pg_class ON(pg_class.relowner = pg_roles.oid) WHERE relname = 'dist_table';
 SELECT run_command_on_workers($$SELECT rolname FROM pg_roles JOIN pg_class ON(pg_class.relowner = pg_roles.oid) WHERE relname = 'dist_table'$$);
 
-SET ROLE test_user;
+SET ROLE non_super_user_test_user;
 SET search_path TO local_schema;
 
 -- ensure we can load data
@@ -94,11 +95,11 @@ SELECT a, b, c , d FROM dist_table ORDER BY 1,2,3,4;
 
 -- Show that dropping the table removes the dependent sequence from pg_dist_object
 -- on both coordinator and metadata worker nodes when ddl propagation is on
-RESET ROLE;
-SET search_path TO local_schema;
 SET citus.enable_ddl_propagation TO ON;
 DROP TABLE dist_table CASCADE;
 
+RESET ROLE;
+SET search_path TO local_schema;
 SELECT * FROM (SELECT pg_identify_object_as_address(classid, objid, objsubid) as obj_identifier from citus.pg_dist_object) as obj_identifiers where obj_identifier::text like '%sequence%';
 SELECT run_command_on_workers($$SELECT * FROM (SELECT pg_identify_object_as_address(classid, objid, objsubid) as obj_identifier from citus.pg_dist_object) as obj_identifiers where obj_identifier::text like '%sequence%';$$);
 
@@ -121,6 +122,33 @@ DROP SCHEMA local_schema CASCADE;
 
 SELECT * FROM (SELECT pg_identify_object_as_address(classid, objid, objsubid) as obj_identifier from citus.pg_dist_object) as obj_identifiers where obj_identifier::text like '%{local_schema}%';
 SELECT run_command_on_workers($$SELECT * FROM (SELECT pg_identify_object_as_address(classid, objid, objsubid) as obj_identifier from citus.pg_dist_object) as obj_identifiers where obj_identifier::text like '%{local_schema}%';$$);
+
+-- Show that distributed function related metadata are also propagated
+set citus.replication_model TO streaming ;
+
+CREATE TABLE test (a int, b int);
+SELECT create_distributed_table('test', 'a');
+CREATE OR REPLACE PROCEDURE proc(dist_key integer, dist_key_2 integer)
+LANGUAGE plpgsql
+AS $$ DECLARE
+res INT := 0;
+BEGIN
+    INSERT INTO test VALUES (dist_key);
+    SELECT count(*) INTO res FROM test;
+    RAISE NOTICE 'Res: %', res;
+COMMIT;
+END;$$;
+
+-- create a distributed function and show its distribution_argument_index
+SELECT create_distributed_function('proc(integer, integer)', 'dist_key', 'test');
+SELECT distribution_argument_index FROM citus.pg_dist_object WHERE objid = 'proc'::regproc;
+SELECT run_command_on_workers($$ SELECT distribution_argument_index FROM citus.pg_dist_object WHERE objid = 'proc'::regproc;$$);
+
+-- re-distribute and show that now the distribution_argument_index is updated on both the coordinator and workers
+SELECT create_distributed_function('proc(integer, integer)', 'dist_key_2', 'test');
+SELECT * FROM citus.pg_dist_object WHERE objid = 'proc'::regproc;
+SELECT distribution_argument_index FROM citus.pg_dist_object WHERE objid = 'proc'::regproc;
+SELECT run_command_on_workers($$ SELECT distribution_argument_index FROM citus.pg_dist_object WHERE objid = 'proc'::regproc;$$);
 
 RESET citus.enable_ddl_propagation;
 SELECT stop_metadata_sync_to_node('localhost', :worker_1_port);

@@ -723,7 +723,10 @@ DistributedObjectMetadataSyncCommandList(void)
 	List *distributionArgumentIndexList = NIL;
 	List *colocationIdList = NIL;
 
-	/* For consistent test results use ordered scan */
+	/* It is not strictly necessary to read the tuples in order.
+	 * However, it is useful to get consistent behavior, both for regression
+	 * tests and also in production systems.
+	 */
 	SysScanDesc pgDistObjectScan = systable_beginscan_ordered(pgDistObjectRel,
 															  pgDistObjectIndexRel, NULL,
 															  0, NULL);
@@ -734,8 +737,8 @@ DistributedObjectMetadataSyncCommandList(void)
 			pgDistObjectTup);
 
 		ObjectAddress *address = palloc(sizeof(ObjectAddress));
-		int32 *colocationIdPtr = palloc(sizeof(int32));
-		int32 *distributionArgumentIndexPtr = palloc(sizeof(int32));
+		int32 colocationId = INVALID_COLOCATION_ID;
+		int32 distributionArgumentIndex = INVALID_DISTRIBUTION_ARGUMENT_INDEX;
 
 		ObjectAddressSubSet(*address, pg_dist_object->classid, pg_dist_object->objid,
 							pg_dist_object->objsubid);
@@ -746,7 +749,7 @@ DistributedObjectMetadataSyncCommandList(void)
 						 Anum_pg_dist_object_distribution_argument_index,
 						 pgDistObjectDesc,
 						 &distributionArgumentIndexIsNull);
-		*distributionArgumentIndexPtr = DatumGetInt32(distributionArgumentIndexDatum);
+		distributionArgumentIndex = DatumGetInt32(distributionArgumentIndexDatum);
 
 		bool colocationIdIsNull = false;
 		Datum colocationIdDatum =
@@ -754,27 +757,29 @@ DistributedObjectMetadataSyncCommandList(void)
 						 Anum_pg_dist_object_distribution_argument_index,
 						 pgDistObjectDesc,
 						 &colocationIdIsNull);
-		*colocationIdPtr = DatumGetInt32(colocationIdDatum);
+		colocationId = DatumGetInt32(colocationIdDatum);
 
 		objectAddressList = lappend(objectAddressList, address);
 
 		if (distributionArgumentIndexIsNull)
 		{
-			distributionArgumentIndexList = lappend(distributionArgumentIndexList, NULL);
+			distributionArgumentIndexList = lappend(distributionArgumentIndexList,
+													INVALID_DISTRIBUTION_ARGUMENT_INDEX);
 		}
 		else
 		{
 			distributionArgumentIndexList = lappend(distributionArgumentIndexList,
-													distributionArgumentIndexPtr);
+													distributionArgumentIndex);
 		}
 
 		if (colocationIdIsNull)
 		{
-			colocationIdList = lappend(colocationIdList, NULL);
+			colocationIdList = lappend(colocationIdList,
+									   INVALID_COLOCATION_ID);
 		}
 		else
 		{
-			colocationIdList = lappend(colocationIdList, colocationIdPtr);
+			colocationIdList = lappend(colocationIdList, colocationId);
 		}
 	}
 
@@ -992,9 +997,9 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 		 currentObjectCounter++)
 	{
 		ObjectAddress *address = list_nth(addresses, currentObjectCounter);
-		int32 *distributionArgumentIndex = list_nth(distributionArgumentIndexes,
-													currentObjectCounter);
-		int32 *colocationId = list_nth(colocationIds, currentObjectCounter);
+		int32 distributionArgumentIndex = list_nth(distributionArgumentIndexes,
+												   currentObjectCounter);
+		int32 colocationId = list_nth(colocationIds, currentObjectCounter);
 		List *names = NIL;
 		List *args = NIL;
 		char *objectType = NULL;
@@ -1047,23 +1052,23 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 
 		appendStringInfo(insertDistributedObjectsCommand, "]::text[],");
 
-		if (distributionArgumentIndex == NULL)
+		if (distributionArgumentIndex == INVALID_DISTRIBUTION_ARGUMENT_INDEX)
 		{
 			appendStringInfo(insertDistributedObjectsCommand, "NULL, ");
 		}
 		else
 		{
 			appendStringInfo(insertDistributedObjectsCommand, "%d, ",
-							 *distributionArgumentIndex);
+							 distributionArgumentIndex);
 		}
-		if (colocationId == NULL)
+		if (colocationId == INVALID_COLOCATION_ID)
 		{
 			appendStringInfo(insertDistributedObjectsCommand, "NULL)");
 		}
 		else
 		{
 			appendStringInfo(insertDistributedObjectsCommand, "%d)",
-							 *colocationId);
+							 colocationId);
 		}
 	}
 

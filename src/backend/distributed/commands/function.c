@@ -641,8 +641,8 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 	if (EnableDependencyCreation)
 	{
 		List *objectAddressList = list_make1((ObjectAddress *) distAddress);
-		List *distributionArgumentIndexList = list_make1(distribution_argument_index);
-		List *colocationIdList = list_make1(colocationId);
+		List *distributionArgumentIndexList = list_make1(*distribution_argument_index);
+		List *colocationIdList = list_make1(*colocationId);
 
 		char *workerPgDistObjectUpdateCommand =
 			MarkObjectsDistributedCreateCommand(objectAddressList,

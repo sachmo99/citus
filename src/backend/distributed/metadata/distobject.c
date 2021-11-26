@@ -28,6 +28,7 @@
 #include "catalog/pg_type.h"
 #include "citus_version.h"
 #include "commands/extension.h"
+#include "distributed/colocation_utils.h"
 #include "distributed/commands/utility_hook.h"
 #include "distributed/metadata/distobject.h"
 #include "distributed/metadata/pg_dist_object.h"
@@ -178,8 +179,9 @@ MarkObjectDistributed(const ObjectAddress *distAddress)
 
 		char *workerPgDistObjectUpdateCommand =
 			MarkObjectsDistributedCreateCommand(objectAddressList,
-												list_make1(NULL),
-												list_make1(NULL));
+												list_make1(
+													INVALID_DISTRIBUTION_ARGUMENT_INDEX),
+												list_make1(INVALID_COLOCATION_ID));
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
 }
