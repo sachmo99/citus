@@ -28,13 +28,13 @@ step detector-dump-wait-edges:
 
 waiting_transaction_num|blocking_transaction_num|blocking_transaction_waiting
 ---------------------------------------------------------------------
-                    408|                     407|f
+                    409|                     408|f
 (1 row)
 
 transactionnumber|waitingtransactionnumbers
 ---------------------------------------------------------------------
-              407|
-              408|                      407
+              408|
+              409|                      408
 (2 rows)
 
 step s1-abort:
@@ -84,16 +84,16 @@ step detector-dump-wait-edges:
 
 waiting_transaction_num|blocking_transaction_num|blocking_transaction_waiting
 ---------------------------------------------------------------------
-                    412|                     411|f
-                    413|                     411|f
-                    413|                     412|t
+                    413|                     412|f
+                    414|                     412|f
+                    414|                     413|t
 (3 rows)
 
 transactionnumber|waitingtransactionnumbers
 ---------------------------------------------------------------------
-              411|
-              412|411
-              413|411,412
+              412|
+              413|412
+              414|412,413
 (3 rows)
 
 step s1-abort:

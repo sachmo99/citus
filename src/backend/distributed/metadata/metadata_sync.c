@@ -471,16 +471,16 @@ SyncMetadataSnapshotToNode(WorkerNode *workerNode, bool raiseOnError)
 	 */
 	if (raiseOnError)
 	{
-		SendCommandListToWorkerInCoordinatedTransaction(workerNode->workerName,
-														workerNode->workerPort,
-														currentUser,
-														recreateMetadataSnapshotCommandList);
+		SendMetadataCommandListToWorkerInCoordinatedTransaction(workerNode->workerName,
+																workerNode->workerPort,
+																currentUser,
+																recreateMetadataSnapshotCommandList);
 		return true;
 	}
 	else
 	{
 		bool success =
-			SendOptionalCommandListToWorkerInCoordinatedTransaction(
+			SendOptionalMetadataCommandListToWorkerInCoordinatedTransaction(
 				workerNode->workerName, workerNode->workerPort,
 				currentUser, recreateMetadataSnapshotCommandList);
 
@@ -506,10 +506,11 @@ DropMetadataSnapshotOnNode(WorkerNode *workerNode)
 	dropMetadataCommandList = lappend(dropMetadataCommandList,
 									  LocalGroupIdUpdateCommand(0));
 
-	SendOptionalCommandListToWorkerInCoordinatedTransaction(workerNode->workerName,
-															workerNode->workerPort,
-															userName,
-															dropMetadataCommandList);
+	SendOptionalMetadataCommandListToWorkerInCoordinatedTransaction(
+		workerNode->workerName,
+		workerNode->workerPort,
+		userName,
+		dropMetadataCommandList);
 }
 
 
@@ -737,8 +738,6 @@ DistributedObjectMetadataSyncCommandList(void)
 			pgDistObjectTup);
 
 		ObjectAddress *address = palloc(sizeof(ObjectAddress));
-		int32 colocationId = INVALID_COLOCATION_ID;
-		int32 distributionArgumentIndex = INVALID_DISTRIBUTION_ARGUMENT_INDEX;
 
 		ObjectAddressSubSet(*address, pg_dist_object->classid, pg_dist_object->objid,
 							pg_dist_object->objsubid);
@@ -749,7 +748,7 @@ DistributedObjectMetadataSyncCommandList(void)
 						 Anum_pg_dist_object_distribution_argument_index,
 						 pgDistObjectDesc,
 						 &distributionArgumentIndexIsNull);
-		distributionArgumentIndex = DatumGetInt32(distributionArgumentIndexDatum);
+		int32 distributionArgumentIndex = DatumGetInt32(distributionArgumentIndexDatum);
 
 		bool colocationIdIsNull = false;
 		Datum colocationIdDatum =
@@ -757,7 +756,7 @@ DistributedObjectMetadataSyncCommandList(void)
 						 Anum_pg_dist_object_distribution_argument_index,
 						 pgDistObjectDesc,
 						 &colocationIdIsNull);
-		colocationId = DatumGetInt32(colocationIdDatum);
+		int32 colocationId = DatumGetInt32(colocationIdDatum);
 
 		objectAddressList = lappend(objectAddressList, address);
 
@@ -1057,7 +1056,6 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 
 		appendStringInfo(insertDistributedObjectsCommand, "%d)",
 						 colocationId);
-
 	}
 
 	appendStringInfo(insertDistributedObjectsCommand, ") ");
@@ -1223,7 +1221,7 @@ ShardListInsertCommand(List *shardIntervalList)
 					 "shardlength, groupid, placementid)  AS (VALUES ");
 
 	ShardInterval *shardInterval = NULL;
-	bool isFirstValue = true;
+	bool firstPlacementProcessed = false;
 	foreach_ptr(shardInterval, shardIntervalList)
 	{
 		uint64 shardId = shardInterval->shardId;
@@ -1232,7 +1230,7 @@ ShardListInsertCommand(List *shardIntervalList)
 		ShardPlacement *placement = NULL;
 		foreach_ptr(placement, shardPlacementList)
 		{
-			if (!isFirstValue)
+			if (firstPlacementProcessed)
 			{
 				/*
 				 * As long as this is not the first placement of the first shard,
@@ -1240,7 +1238,7 @@ ShardListInsertCommand(List *shardIntervalList)
 				 */
 				appendStringInfo(insertPlacementCommand, ", ");
 			}
-			isFirstValue = false;
+			firstPlacementProcessed = true;
 
 			appendStringInfo(insertPlacementCommand,
 							 "(%ld, %d, %ld, %d, %ld)",
@@ -1315,9 +1313,25 @@ ShardListInsertCommand(List *shardIntervalList)
 					 "storagetype, shardminvalue, shardmaxvalue) "
 					 "FROM shard_data;");
 
-	/* first insert shards, than the placements */
-	commandList = lappend(commandList, insertShardCommand->data);
-	commandList = lappend(commandList, insertPlacementCommand->data);
+	/*
+	 * There are no active placements for the table, so do not create the
+	 * command as it'd lead to syntax error.
+	 *
+	 * This is normally not an expected situation, however the current
+	 * implementation of citus_disable_node allows to disable nodes with
+	 * the only active placements. So, for example a single shard/placement
+	 * distributed table on a disabled node might trigger zero placement
+	 * case.
+	 *
+	 * TODO: remove this check once citus_disable_node errors out for
+	 * the above scenario.
+	 */
+	if (firstPlacementProcessed)
+	{
+		/* first insert shards, than the placements */
+		commandList = lappend(commandList, insertShardCommand->data);
+		commandList = lappend(commandList, insertPlacementCommand->data);
+	}
 
 	return commandList;
 }
