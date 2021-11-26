@@ -6,6 +6,7 @@ CREATE OR REPLACE FUNCTION pg_catalog.citus_internal_add_object_metadata(
                             colocationid int)
     RETURNS void
     LANGUAGE C
+    STRICT
     AS 'MODULE_PATHNAME';
 
 COMMENT ON FUNCTION pg_catalog.citus_internal_add_object_metadata(text,text[],text[],int,int) IS

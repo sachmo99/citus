@@ -720,7 +720,7 @@ DistributedObjectMetadataSyncCommandList(void)
 	TupleDesc pgDistObjectDesc = RelationGetDescr(pgDistObjectRel);
 
 	List *objectAddressList = NIL;
-	List *distributionArgumentIndexList = NIL;
+	List *distArgumentIndexList = NIL;
 	List *colocationIdList = NIL;
 
 	/* It is not strictly necessary to read the tuples in order.
@@ -763,23 +763,23 @@ DistributedObjectMetadataSyncCommandList(void)
 
 		if (distributionArgumentIndexIsNull)
 		{
-			distributionArgumentIndexList = lappend(distributionArgumentIndexList,
-													INVALID_DISTRIBUTION_ARGUMENT_INDEX);
+			distArgumentIndexList = lappend_int(distArgumentIndexList,
+												INVALID_DISTRIBUTION_ARGUMENT_INDEX);
 		}
 		else
 		{
-			distributionArgumentIndexList = lappend(distributionArgumentIndexList,
-													distributionArgumentIndex);
+			distArgumentIndexList = lappend_int(distArgumentIndexList,
+												distributionArgumentIndex);
 		}
 
 		if (colocationIdIsNull)
 		{
-			colocationIdList = lappend(colocationIdList,
-									   INVALID_COLOCATION_ID);
+			colocationIdList = lappend_int(colocationIdList,
+										   INVALID_COLOCATION_ID);
 		}
 		else
 		{
-			colocationIdList = lappend(colocationIdList, colocationId);
+			colocationIdList = lappend_int(colocationIdList, colocationId);
 		}
 	}
 
@@ -789,7 +789,7 @@ DistributedObjectMetadataSyncCommandList(void)
 
 	char *workerMetadataUpdateCommand =
 		MarkObjectsDistributedCreateCommand(objectAddressList,
-											distributionArgumentIndexList,
+											distArgumentIndexList,
 											colocationIdList);
 	List *commandList = list_make1(workerMetadataUpdateCommand);
 
@@ -997,9 +997,9 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 		 currentObjectCounter++)
 	{
 		ObjectAddress *address = list_nth(addresses, currentObjectCounter);
-		int32 distributionArgumentIndex = list_nth(distributionArgumentIndexes,
-												   currentObjectCounter);
-		int32 colocationId = list_nth(colocationIds, currentObjectCounter);
+		int distributionArgumentIndex = list_nth_int(distributionArgumentIndexes,
+													 currentObjectCounter);
+		int colocationId = list_nth_int(colocationIds, currentObjectCounter);
 		List *names = NIL;
 		List *args = NIL;
 		char *objectType = NULL;
@@ -1052,24 +1052,12 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 
 		appendStringInfo(insertDistributedObjectsCommand, "]::text[],");
 
-		if (distributionArgumentIndex == INVALID_DISTRIBUTION_ARGUMENT_INDEX)
-		{
-			appendStringInfo(insertDistributedObjectsCommand, "NULL, ");
-		}
-		else
-		{
-			appendStringInfo(insertDistributedObjectsCommand, "%d, ",
-							 distributionArgumentIndex);
-		}
-		if (colocationId == INVALID_COLOCATION_ID)
-		{
-			appendStringInfo(insertDistributedObjectsCommand, "NULL)");
-		}
-		else
-		{
-			appendStringInfo(insertDistributedObjectsCommand, "%d)",
-							 colocationId);
-		}
+		appendStringInfo(insertDistributedObjectsCommand, "%d, ",
+						 distributionArgumentIndex);
+
+		appendStringInfo(insertDistributedObjectsCommand, "%d)",
+						 colocationId);
+
 	}
 
 	appendStringInfo(insertDistributedObjectsCommand, ") ");
@@ -1093,17 +1081,8 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	char *textType = TextDatumGetCString(PG_GETARG_DATUM(0));
 	ArrayType *nameArray = PG_GETARG_ARRAYTYPE_P(1);
 	ArrayType *argsArray = PG_GETARG_ARRAYTYPE_P(2);
-	int distributionArgumentIndex = INVALID_DISTRIBUTION_ARGUMENT_INDEX;
-	int colocationId = INVALID_COLOCATION_ID;
-
-	if (!PG_ARGISNULL(3))
-	{
-		distributionArgumentIndex = PG_GETARG_INT32(3);
-	}
-	if (!PG_ARGISNULL(4))
-	{
-		colocationId = PG_GETARG_INT32(4);
-	}
+	int distributionArgumentIndex = PG_GETARG_INT32(3);
+	int colocationId = PG_GETARG_INT32(4);
 
 	if (!ShouldSkipMetadataChecks())
 	{

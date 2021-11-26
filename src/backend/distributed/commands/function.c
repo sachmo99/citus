@@ -641,12 +641,30 @@ UpdateFunctionDistributionInfo(const ObjectAddress *distAddress,
 	if (EnableDependencyCreation)
 	{
 		List *objectAddressList = list_make1((ObjectAddress *) distAddress);
-		List *distributionArgumentIndexList = list_make1(*distribution_argument_index);
-		List *colocationIdList = list_make1(*colocationId);
+		List *distArgumentIndexList = NIL;
+		List *colocationIdList = NIL;
+
+		if (distribution_argument_index == NULL)
+		{
+			distArgumentIndexList = list_make1_int(INVALID_DISTRIBUTION_ARGUMENT_INDEX);
+		}
+		else
+		{
+			distArgumentIndexList = list_make1_int(*distribution_argument_index);
+		}
+
+		if (colocationId == NULL)
+		{
+			colocationIdList = list_make1_int(INVALID_COLOCATION_ID);
+		}
+		else
+		{
+			colocationIdList = list_make1_int(*colocationId);
+		}
 
 		char *workerPgDistObjectUpdateCommand =
 			MarkObjectsDistributedCreateCommand(objectAddressList,
-												distributionArgumentIndexList,
+												distArgumentIndexList,
 												colocationIdList);
 		SendCommandToWorkersWithMetadata(workerPgDistObjectUpdateCommand);
 	}
