@@ -1106,36 +1106,6 @@ ColocatedNonPartitionShardIntervalList(ShardInterval *shardInterval)
 
 
 /*
- * IsTableExistWithColocationId check whether distributed table exists with
- * given colocation id, if so returns true. Returns false otherwise
- */
-bool
-IsTableExistWithColocationId(Oid colocationId)
-{
-	bool isTableExistWithColocationId = false;
-	ScanKeyData scanKey[1];
-	int scanKeyCount = 1;
-	bool indexOK = true;
-
-	ScanKeyInit(&scanKey[0], Anum_pg_dist_partition_colocationid,
-				BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(colocationId));
-
-	Relation pgDistPartition = table_open(DistPartitionRelationId(), AccessShareLock);
-	SysScanDesc scanDescriptor = systable_beginscan(pgDistPartition,
-													DistPartitionColocationidIndexId(),
-													indexOK, NULL, scanKeyCount, scanKey);
-
-	HeapTuple heapTuple = systable_getnext(scanDescriptor);
-	if (HeapTupleIsValid(heapTuple))
-	{
-		isTableExistWithColocationId = true;
-	}
-
-	return isTableExistWithColocationId;
-}
-
-
-/*
  * ColocatedTableId returns an arbitrary table which belongs to given colocation
  * group. If there is not such a colocation group, it returns invalid oid.
  *

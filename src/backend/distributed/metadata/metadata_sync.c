@@ -86,9 +86,6 @@ char *EnableManualMetadataChangesForUser = "";
 static void EnsureSequentialModeMetadataOperations(void);
 static List * DistributedObjectMetadataSyncCommandList(void);
 static List * GetDistributedTableDDLEvents(Oid relationId);
-static void EnsureObjectMetadataIsSane(char *textType,
-									   ArrayType *argsArray,
-									   int colocationId);
 static char * LocalGroupIdUpdateCommand(int32 groupId);
 static List * SequenceDependencyCommandList(Oid relationId);
 static char * TruncateTriggerCreateCommand(Oid relationId);
@@ -1127,6 +1124,7 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 
 	PG_RETURN_VOID();
 }
+
 
 /*
  * DistributionCreateCommands generates a commands that can be
