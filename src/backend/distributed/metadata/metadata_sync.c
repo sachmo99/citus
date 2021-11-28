@@ -1049,7 +1049,7 @@ MarkObjectsDistributedCreateCommand(List *addresses,
 								   quote_literal_cstr(arg));
 		}
 
-		appendStringInfo(insertDistributedObjectsCommand, "]::text[],");
+		appendStringInfo(insertDistributedObjectsCommand, "]::text[], ");
 
 		appendStringInfo(insertDistributedObjectsCommand, "%d, ",
 						 distributionArgumentIndex);
@@ -1101,16 +1101,23 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	SetLocalEnableDependencyCreation(false);
 
 	MarkObjectDistributed(&objectAddress);
-	if (colocationId != INVALID_COLOCATION_ID || distributionArgumentIndex !=
-		INVALID_DISTRIBUTION_ARGUMENT_INDEX)
+
+	if (distributionArgumentIndex != INVALID_DISTRIBUTION_ARGUMENT_INDEX ||
+		colocationId != INVALID_COLOCATION_ID)
 	{
+		int *distributionArgumentIndexAddress =
+			distributionArgumentIndex == INVALID_DISTRIBUTION_ARGUMENT_INDEX ?
+			NULL :
+			&distributionArgumentIndex;
+
+		int *colocationIdAddress =
+			colocationId == INVALID_COLOCATION_ID ?
+			NULL :
+			&colocationId;
+
 		UpdateFunctionDistributionInfo(&objectAddress,
-									   &distributionArgumentIndex,
-									   &colocationId);
-	}
-	else
-	{
-		UpdateFunctionDistributionInfo(&objectAddress, NULL, NULL);
+									   distributionArgumentIndexAddress,
+									   colocationIdAddress);
 	}
 
 	SetLocalEnableDependencyCreation(prevDependencyCreationValue);
