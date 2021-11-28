@@ -1088,7 +1088,36 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 		EnsureCoordinatorInitiatedOperation();
 	}
 
-	/* We check the acl/ownership while getting the object address */
+	/*
+	 * distributionArgumentIndex and colocationId must be valid or invalid
+	 * together. In other words, we can't have one as valid and other one
+	 * as invalid
+	 */
+	bool isColocationIdValid = false;
+	bool isDistributionArgumentIndexValid = false;
+
+	if (colocationId != INVALID_COLOCATION_ID)
+	{
+		isColocationIdValid = true;
+	}
+
+	if (distributionArgumentIndex != INVALID_DISTRIBUTION_ARGUMENT_INDEX)
+	{
+		isDistributionArgumentIndexValid = true;
+	}
+
+	if (isColocationIdValid != isDistributionArgumentIndexValid)
+	{
+		ereport(ERROR, (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+						errmsg("Both colocationid and distribution_argument_index"
+							   " must be valid or invalid.")));
+	}
+
+	/*
+	 * We check the acl/ownership while getting the object address. That
+	 * funtion also checks the sanity of given textType, nameArray and
+	 * argsArray parameters
+	 */
 	ObjectAddress objectAddress = PgGetObjectAddress(textType, nameArray,
 													 argsArray);
 

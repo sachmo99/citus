@@ -339,6 +339,58 @@ BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
 	SELECT citus_internal_add_shard_metadata(relationname, shardid, storagetype, shardminvalue, shardmaxvalue) FROM shard_data;
 ROLLBACK;
 
+-- Now let's check valid pg_dist_object updates
+
+-- check with non-existing object type
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	SELECT assign_distributed_transaction_id(0, 8, '2021-07-09 15:41:55.542377+02');
+	SET application_name to 'citus';
+	\set VERBOSITY terse
+	WITH distributed_object_data(typetext, objnames, objargs, distargumentindex, colocationid)
+		AS (VALUES ('non_existing_type', ARRAY['non_existing_user']::text[], ARRAY[]::text[], -1, 0))
+	SELECT citus_internal_add_object_metadata(typetext, objnames, objargs, distargumentindex, colocationid) FROM distributed_object_data;
+ROLLBACK;
+
+-- check with non-existing object
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	SELECT assign_distributed_transaction_id(0, 8, '2021-07-09 15:41:55.542377+02');
+	SET application_name to 'citus';
+	\set VERBOSITY terse
+	WITH distributed_object_data(typetext, objnames, objargs, distargumentindex, colocationid)
+		AS (VALUES ('role', ARRAY['non_existing_user']::text[], ARRAY[]::text[], -1, 0))
+	SELECT citus_internal_add_object_metadata(typetext, objnames, objargs, distargumentindex, colocationid) FROM distributed_object_data;
+ROLLBACK;
+
+-- distargumentindex and colocation must be valid or invalid together
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	SELECT assign_distributed_transaction_id(0, 8, '2021-07-09 15:41:55.542377+02');
+	SET application_name to 'citus';
+	\set VERBOSITY terse
+	WITH distributed_object_data(typetext, objnames, objargs, distargumentindex, colocationid)
+		AS (VALUES ('role', ARRAY['metadata_sync_helper_role']::text[], ARRAY[]::text[], 0, 0))
+	SELECT citus_internal_add_object_metadata(typetext, objnames, objargs, distargumentindex, colocationid) FROM distributed_object_data;
+ROLLBACK;
+
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	SELECT assign_distributed_transaction_id(0, 8, '2021-07-09 15:41:55.542377+02');
+	SET application_name to 'citus';
+	\set VERBOSITY terse
+	WITH distributed_object_data(typetext, objnames, objargs, distargumentindex, colocationid)
+		AS (VALUES ('role', ARRAY['metadata_sync_helper_role']::text[], ARRAY[]::text[], -1, 1))
+	SELECT citus_internal_add_object_metadata(typetext, objnames, objargs, distargumentindex, colocationid) FROM distributed_object_data;
+ROLLBACK;
+
+-- since citus_internal_add_object_metadata is strict function returns NULL
+-- if any parameter is NULL
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	SELECT assign_distributed_transaction_id(0, 8, '2021-07-09 15:41:55.542377+02');
+	SET application_name to 'citus';
+	\set VERBOSITY terse
+	WITH distributed_object_data(typetext, objnames, objargs, distargumentindex, colocationid)
+		AS (VALUES ('role', ARRAY['metadata_sync_helper_role']::text[], ARRAY[]::text[], 0, NULL::int))
+	SELECT citus_internal_add_object_metadata(typetext, objnames, objargs, distargumentindex, colocationid) FROM distributed_object_data;
+ROLLBACK;
+
 \c - postgres - :worker_1_port
 
 -- we do not allow wrong partmethod
