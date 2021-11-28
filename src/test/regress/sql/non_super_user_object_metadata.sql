@@ -3,9 +3,6 @@ SET citus.enable_ddl_propagation TO OFF;
 CREATE SCHEMA local_schema;
 SET search_path TO local_schema;
 
-SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
-SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
-
 -- Create type and function that depends on it
 CREATE TYPE test_type AS (f1 int, f2 text);
 CREATE FUNCTION test_function(int) RETURNS test_type
@@ -182,10 +179,12 @@ SELECT * FROM run_command_on_workers($$SELECT * FROM (SELECT pg_identify_object_
 
 SELECT stop_metadata_sync_to_node('localhost', :worker_1_port);
 SELECT stop_metadata_sync_to_node('localhost', :worker_2_port);
-RESET citus.enable_ddl_propagation;
 
 -- Show that we don't have any object metadata after stopping syncing
 SELECT * FROM run_command_on_workers($$SELECT pg_identify_object_as_address(classid, objid, objsubid) from citus.pg_dist_object;$$) ORDER BY 1,2;
 
--- Revert the shard replication factor back for following tests
-set citus.shard_replication_factor to 2;
+-- Revert the settings for following tests
+RESET citus.enable_ddl_propagation;
+RESET citus.shard_replication_factor;
+SELECT start_metadata_sync_to_node('localhost', :worker_1_port);
+SELECT start_metadata_sync_to_node('localhost', :worker_2_port);
