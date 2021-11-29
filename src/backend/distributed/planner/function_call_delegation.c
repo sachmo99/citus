@@ -112,9 +112,15 @@ TryToDelegateFunctionCall(DistributedPlanningContext *planContext)
 	}
 
 	int32 localGroupId = GetLocalGroupId();
-	if (localGroupId != COORDINATOR_GROUP_ID || localGroupId == GROUP_ID_UPGRADING)
+	if (localGroupId != COORDINATOR_GROUP_ID && IsCitusInitiatedRemoteBackend())
 	{
-		/* do not delegate from workers, or while upgrading */
+		/* do not delegate from workers if it is not initiated from */
+		return NULL;
+	}
+
+	if (localGroupId == GROUP_ID_UPGRADING)
+	{
+		/* do not delegate while upgrading */
 		return NULL;
 	}
 
