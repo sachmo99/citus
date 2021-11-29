@@ -86,6 +86,8 @@ char *EnableManualMetadataChangesForUser = "";
 static void EnsureSequentialModeMetadataOperations(void);
 static List * DistributedObjectMetadataSyncCommandList(void);
 static List * GetDistributedTableDDLEvents(Oid relationId);
+static void EnsureObjectMetadataIsSane(int distributionArgumentIndex,
+									   int colocationId);
 static char * LocalGroupIdUpdateCommand(int32 groupId);
 static List * SequenceDependencyCommandList(Oid relationId);
 static char * TruncateTriggerCreateCommand(Oid relationId);
@@ -1086,6 +1088,13 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	{
 		/* this UDF is not allowed for executing as a separate command */
 		EnsureCoordinatorInitiatedOperation();
+
+		/*
+		 * Ensure given distributionArgumentIndex and colocationId values are
+		 * sane. Since we check sanity of object related parameters within
+		 * PgGetObjectAddress below, we are not checking them here.
+		 */
+		EnsureObjectMetadataIsSane(distributionArgumentIndex, colocationId);
 	}
 
 	/*
@@ -1125,6 +1134,33 @@ citus_internal_add_object_metadata(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
+
+/*
+ * EnsureObjectMetadataIsSane checks whether the distribution argument index and
+ * colocation id metadata params for distributed object is sane. You can look
+ * PgGetObjectAddress to find checks related to object sanity.
+ */
+static void
+EnsureObjectMetadataIsSane(int distributionArgumentIndex, int colocationId)
+{
+	if (distributionArgumentIndex != INVALID_DISTRIBUTION_ARGUMENT_INDEX)
+	{
+		if (distributionArgumentIndex < 0 ||
+			distributionArgumentIndex > FUNC_MAX_ARGS)
+		{
+			ereport(ERROR, errmsg("distribution_argument_index must be between"
+								  " 0 and %d", FUNC_MAX_ARGS));
+		}
+	}
+
+	if (colocationId != INVALID_COLOCATION_ID)
+	{
+		if (colocationId < 0)
+		{
+			ereport(ERROR, errmsg("colocationId must be a positive number"));
+		}
+	}
+}
 
 /*
  * DistributionCreateCommands generates a commands that can be
