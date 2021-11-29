@@ -193,10 +193,6 @@ WHERE objid = 'eq_mi''xed_param_names(macaddr, macaddr)'::regprocedure;
 -- also show that we can use the function
 SELECT * FROM run_command_on_workers($$SELECT function_tests."eq_mi'xed_param_names"('0123456789ab','ba9876543210');$$) ORDER BY 1,2;
 
--- make sure that none of the active and primary nodes has
--- function's metadata as it doesn't have a parameter
-SELECT * FROM run_command_on_workers($$SELECT * FROM (SELECT pg_identify_object_as_address(classid, objid, objsubid) as obj_identifier from citus.pg_dist_object) as obj_identifiers where obj_identifier::text like '%eq_mi''xed_param_names%';$$) ORDER BY 1,2;
-
 -- try to co-locate with a table that uses statement-based replication
 SELECT create_distributed_function('increment(int2)', '$1');
 SELECT create_distributed_function('increment(int2)', '$1', colocate_with := 'statement_table');

@@ -192,14 +192,6 @@ SELECT create_distributed_table('streaming_table','id');
 
 (1 row)
 
--- make sure that none of the active and primary nodes hasmetadata
--- at the start of the test
-select bool_or(hasmetadata) from pg_dist_node WHERE isactive AND  noderole = 'primary';
- bool_or
----------------------------------------------------------------------
- f
-(1 row)
-
 -- if not paremeters are supplied, we'd see that function doesn't have
 -- distribution_argument_index and colocationid
 SELECT create_distributed_function('"eq_mi''xed_param_names"(macaddr, macaddr)');
@@ -222,14 +214,6 @@ SELECT * FROM run_command_on_workers($$SELECT function_tests."eq_mi'xed_param_na
  localhost |    57637 | t       | f
  localhost |    57638 | t       | f
 (2 rows)
-
--- make sure that none of the active and primary nodes hasmetadata
--- since the function doesn't have a parameter
-select bool_or(hasmetadata) from pg_dist_node WHERE isactive AND  noderole = 'primary';
- bool_or
----------------------------------------------------------------------
- f
-(1 row)
 
 -- try to co-locate with a table that uses statement-based replication
 SELECT create_distributed_function('increment(int2)', '$1');
@@ -594,13 +578,6 @@ SELECT run_command_on_workers($$SELECT count(*) FROM pg_proc WHERE proname='eq_w
  (localhost,57637,t,0)
  (localhost,57638,t,0)
 (2 rows)
-
--- make sure that none of the active and primary nodes hasmetadata
-select bool_or(hasmetadata) from pg_dist_node WHERE isactive AND  noderole = 'primary';
- bool_or
----------------------------------------------------------------------
- t
-(1 row)
 
 -- valid distribution with distribution_arg_name
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', distribution_arg_name:='val1');

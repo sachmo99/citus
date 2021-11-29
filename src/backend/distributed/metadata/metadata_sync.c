@@ -1162,6 +1162,7 @@ EnsureObjectMetadataIsSane(int distributionArgumentIndex, int colocationId)
 	}
 }
 
+
 /*
  * DistributionCreateCommands generates a commands that can be
  * executed to replicate the metadata for a distributed table.
