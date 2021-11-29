@@ -184,10 +184,6 @@ CREATE TABLE streaming_table(id macaddr);
 SET citus.shard_replication_factor TO 1;
 SELECT create_distributed_table('streaming_table','id');
 
--- make sure that none of the active and primary nodes hasmetadata
--- at the start of the test
-select bool_or(hasmetadata) from pg_dist_node WHERE isactive AND  noderole = 'primary';
-
 -- if not paremeters are supplied, we'd see that function doesn't have
 -- distribution_argument_index and colocationid
 SELECT create_distributed_function('"eq_mi''xed_param_names"(macaddr, macaddr)');
@@ -197,9 +193,9 @@ WHERE objid = 'eq_mi''xed_param_names(macaddr, macaddr)'::regprocedure;
 -- also show that we can use the function
 SELECT * FROM run_command_on_workers($$SELECT function_tests."eq_mi'xed_param_names"('0123456789ab','ba9876543210');$$) ORDER BY 1,2;
 
--- make sure that none of the active and primary nodes hasmetadata
--- since the function doesn't have a parameter
-select bool_or(hasmetadata) from pg_dist_node WHERE isactive AND  noderole = 'primary';
+-- make sure that none of the active and primary nodes has
+-- function's metadata as it doesn't have a parameter
+SELECT * FROM run_command_on_workers($$SELECT * FROM (SELECT pg_identify_object_as_address(classid, objid, objsubid) as obj_identifier from citus.pg_dist_object) as obj_identifiers where obj_identifier::text like '%eq_mi''xed_param_names%';$$) ORDER BY 1,2;
 
 -- try to co-locate with a table that uses statement-based replication
 SELECT create_distributed_function('increment(int2)', '$1');
@@ -356,9 +352,6 @@ ROLLBACK;
 
 -- make sure that none of the nodes have the function because we've rollbacked
 SELECT run_command_on_workers($$SELECT count(*) FROM pg_proc WHERE proname='eq_with_param_names';$$);
-
--- make sure that none of the active and primary nodes hasmetadata
-select bool_or(hasmetadata) from pg_dist_node WHERE isactive AND  noderole = 'primary';
 
 -- valid distribution with distribution_arg_name
 SELECT create_distributed_function('eq_with_param_names(macaddr, macaddr)', distribution_arg_name:='val1');
