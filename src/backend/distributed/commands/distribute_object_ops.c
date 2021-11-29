@@ -81,7 +81,7 @@ static DistributeObjectOps Any_AlterExtensionContents = {
 	.address = NULL,
 };
 static DistributeObjectOps Any_AlterForeignServer = {
-	.deparse = NULL,
+	.deparse = DeparseAlterForeignServerStmt,
 	.qualify = NULL,
 	.preprocess = PreprocessAlterForeignServerStmt,
 	.postprocess = NULL,
