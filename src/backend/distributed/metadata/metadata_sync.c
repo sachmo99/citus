@@ -755,7 +755,7 @@ DistributedObjectMetadataSyncCommandList(void)
 		bool colocationIdIsNull = false;
 		Datum colocationIdDatum =
 			heap_getattr(pgDistObjectTup,
-						 Anum_pg_dist_object_distribution_argument_index,
+						 Anum_pg_dist_object_colocationid,
 						 pgDistObjectDesc,
 						 &colocationIdIsNull);
 		int32 colocationId = DatumGetInt32(colocationIdDatum);
