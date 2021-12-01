@@ -20,6 +20,7 @@
 #include "distributed/multi_client_executor.h"
 #include "distributed/multi_server_executor.h"
 #include "distributed/remote_commands.h"
+#include "distributed/tuplestore.h"
 #include "distributed/version_compat.h"
 #include "distributed/worker_protocol.h"
 #include "funcapi.h"
@@ -32,6 +33,7 @@
 #define CONNECTIVITY_CHECK_QUERY "SELECT 1"
 
 PG_FUNCTION_INFO_V1(citus_check_connection_to_node);
+PG_FUNCTION_INFO_V1(citus_check_cluster_node_health);
 PG_FUNCTION_INFO_V1(master_run_on_worker);
 
 static bool CheckConnectionToNode(char *nodeName, uint32 nodePort);
@@ -61,6 +63,8 @@ static Tuplestorestate * CreateTupleStore(TupleDesc tupleDescriptor,
 										  StringInfo *nodeNameArray, int *nodePortArray,
 										  bool *statusArray,
 										  StringInfo *resultArray, int commandCount);
+static void StoreAllConnectivityChecks(Tuplestorestate *tupleStore,
+									   TupleDesc tupleDescriptor);
 
 
 /*
@@ -91,6 +95,36 @@ CheckConnectionToNode(char *nodeName, uint32 nodePort)
 
 	return responseStatus == RESPONSE_OKAY;
 }
+
+
+/*
+ * citus_check_cluster_node_health UDF performs connectivity checks from all the nodes to
+ * all the nodes, and report success status
+ */
+Datum
+citus_check_cluster_node_health(PG_FUNCTION_ARGS)
+{
+	CheckCitusVersion(ERROR);
+
+	TupleDesc tupleDescriptor = NULL;
+	Tuplestorestate *tupleStore = SetupTuplestore(fcinfo, &tupleDescriptor);
+
+	StoreAllConnectivityChecks(tupleStore, tupleDescriptor);
+
+	/* clean up and return the tuplestore */
+	tuplestore_donestoring(tupleStore);
+
+	PG_RETURN_VOID();
+}
+
+
+/*
+ * StoreAllConnectivityChecks performs connectivity checks from all the nodes to all the
+ * nodes, and report success status
+ */
+static void
+StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescriptor)
+{ }
 
 
 /*

@@ -319,6 +319,8 @@ SELECT citus_check_connection_to_node('localhost', :worker_2_port);
 
 \c - - - :master_port
 
+SELECT * FROM citus_check_cluster_node_health();
+
 RESET client_min_messages;
 DROP SCHEMA tools CASCADE;
 RESET SEARCH_PATH;
