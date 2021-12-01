@@ -1,6 +1,7 @@
 -- citus--10.2-4--11.0-1
 
 -- bump version to 11.0-1
+#include "udfs/citus_disable_node/11.0-1.sql"
 
 #include "udfs/citus_internal_add_object_metadata/11.0-1.sql";
 
