@@ -113,7 +113,8 @@ static void EnsureLocalTableEmptyIfNecessary(Oid relationId, char distributionMe
 static bool ShouldLocalTableBeEmpty(Oid relationId, char distributionMethod, bool
 									viaDeprecatedAPI);
 static void EnsureCitusTableCanBeCreated(Oid relationOid);
-static void EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid);
+static void EnsureSequenceExistOnMetadataWorkersForRelation(Oid relationId,
+															Oid sequenceOid);
 static List * GetFKeyCreationCommandsRelationInvolvedWithTableType(Oid relationId,
 																   int tableTypeFlag);
 static Oid DropFKeysAndUndistributeTable(Oid relationId);
@@ -699,18 +700,20 @@ MarkSequenceDistributedAndPropagateWithDependencies(Oid relationId, Oid sequence
 	ObjectAddress sequenceAddress = { 0 };
 	ObjectAddressSet(sequenceAddress, RelationRelationId, sequenceOid);
 	EnsureDependenciesExistOnAllNodes(&sequenceAddress);
-	EnsureSequenceExistForRelation(relationId, sequenceOid);
+	EnsureSequenceExistOnMetadataWorkersForRelation(relationId, sequenceOid);
 	MarkObjectDistributed(&sequenceAddress);
 }
 
 
 /*
- * EnsureSequenceExistForRelation ensures sequence for the given relation
+ * EnsureSequenceExistOnMetadataWorkersForRelation ensures sequence for the given relation
  * exist on each worker node with metadata.
  */
 static void
-EnsureSequenceExistForRelation(Oid relationId, Oid sequenceOid)
+EnsureSequenceExistOnMetadataWorkersForRelation(Oid relationId, Oid sequenceOid)
 {
+	Assert(ShouldSyncTableMetadata(relationId));
+
 	char *ownerName = TableOwner(relationId);
 	List *sequenceDDLList = DDLCommandsForSequence(sequenceOid, ownerName);
 

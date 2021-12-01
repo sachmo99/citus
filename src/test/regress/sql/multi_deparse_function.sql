@@ -67,6 +67,9 @@ CREATE FUNCTION add(integer, integer) RETURNS integer
     LANGUAGE SQL
     IMMUTABLE
     RETURNS NULL ON NULL INPUT;
+-- Since deparse logic on workers can not work for if function
+-- is distributed on workers, we are disabling object propagation
+-- first. Same trick has been applied multiple times in this test.
 SET citus.enable_object_propagation TO OFF;
 SELECT create_distributed_function('add(int,int)');
 RESET citus.enable_object_propagation;
