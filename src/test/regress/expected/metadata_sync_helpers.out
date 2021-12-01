@@ -630,9 +630,9 @@ ROLLBACK;
 -- which is known how to distribute
 BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
 	SELECT assign_distributed_transaction_id(0, 8, '2021-07-09 15:41:55.542377+02');
- assign_distributed_transaction_id 
------------------------------------
- 
+ assign_distributed_transaction_id
+---------------------------------------------------------------------
+
 (1 row)
 
 	SET application_name to 'citus';
@@ -648,9 +648,9 @@ ROLLBACK;
 -- Show that citus_internal_add_object_metadata checks the priviliges
 BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
     SELECT assign_distributed_transaction_id(0, 8, '2021-07-09 15:41:55.542377+02');
- assign_distributed_transaction_id 
------------------------------------
- 
+ assign_distributed_transaction_id
+---------------------------------------------------------------------
+
 (1 row)
 
     SET application_name to 'citus';
