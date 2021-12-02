@@ -33,7 +33,7 @@ test: alter_database_owner
 
 test: multi_test_catalog_views
 test: check_mx
-test: turn_mx_off
+#test: turn_mx_off
 test: multi_table_ddl
 test: multi_sequence_default
 test: multi_name_lengths

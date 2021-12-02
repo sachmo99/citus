@@ -60,7 +60,7 @@ test: tableam drop_column_partitioned_table
 
 # mx-less tests
 test: check_mx
-test: turn_mx_off
+#test: turn_mx_off
 test: undistribute_table
 test: turn_mx_on
 
