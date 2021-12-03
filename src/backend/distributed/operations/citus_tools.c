@@ -183,6 +183,7 @@ StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescripto
 
 			tuplestore_putvalues(tupleStore, tupleDescriptor, values, isNulls);
 
+			PQclear(result);
 			ForgetResults(connection);
 		}
 	}
