@@ -20,6 +20,8 @@
 #include "distributed/multi_client_executor.h"
 #include "distributed/multi_server_executor.h"
 #include "distributed/remote_commands.h"
+#include "distributed/listutils.h"
+#include "distributed/lock_graph.h"
 #include "distributed/tuplestore.h"
 #include "distributed/version_compat.h"
 #include "distributed/worker_protocol.h"
@@ -31,6 +33,7 @@
 
 /* simple query to run on workers to check connectivity */
 #define CONNECTIVITY_CHECK_QUERY "SELECT 1"
+#define CONNECTIVITY_CHECK_COLUMNS 5
 
 PG_FUNCTION_INFO_V1(citus_check_connection_to_node);
 PG_FUNCTION_INFO_V1(citus_check_cluster_node_health);
@@ -65,6 +68,7 @@ static Tuplestorestate * CreateTupleStore(TupleDesc tupleDescriptor,
 										  StringInfo *resultArray, int commandCount);
 static void StoreAllConnectivityChecks(Tuplestorestate *tupleStore,
 									   TupleDesc tupleDescriptor);
+static char * GetConnectivityCheckCommand(const char *nodeName, const uint32 nodePort);
 
 
 /*
@@ -119,12 +123,70 @@ citus_check_cluster_node_health(PG_FUNCTION_ARGS)
 
 
 /*
+ * GetConnectivityCheckCommand returns the command to check connections to a node
+ */
+static char *
+GetConnectivityCheckCommand(const char *nodeName, const uint32 nodePort)
+{
+	StringInfo connectivityCheckCommand = makeStringInfo();
+	appendStringInfo(connectivityCheckCommand,
+					 "SELECT citus_check_connection_to_node('%s', %d)",
+					 nodeName, nodePort);
+
+	return connectivityCheckCommand->data;
+}
+
+
+/*
  * StoreAllConnectivityChecks performs connectivity checks from all the nodes to all the
  * nodes, and report success status
  */
 static void
 StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescriptor)
-{ }
+{
+	Datum values[CONNECTIVITY_CHECK_COLUMNS];
+	bool isNulls[CONNECTIVITY_CHECK_COLUMNS];
+
+	List *workerNodeList = ActivePrimaryNodeList(ShareLock);
+
+	WorkerNode *workerNode = NULL;
+	foreach_ptr(workerNode, workerNodeList)
+	{
+		const char *nodeName = workerNode->workerName;
+		const int nodePort = workerNode->workerPort;
+		int32 connectionFlags = 0;
+
+		MultiConnection *connection =
+			StartNodeConnection(connectionFlags, nodeName, nodePort);
+
+		WorkerNode *targetWorkerNode = NULL;
+		foreach_ptr(targetWorkerNode, workerNodeList)
+		{
+			const char *targetNodeName = targetWorkerNode->workerName;
+			const int targetNodePort = targetWorkerNode->workerPort;
+
+			char *connectivityCheckCommand =
+				GetConnectivityCheckCommand(targetNodeName, targetNodePort);
+
+			PGresult *result = NULL;
+			ExecuteOptionalRemoteCommand(connection, connectivityCheckCommand, &result);
+
+			/* get ready for the next tuple */
+			memset(values, 0, sizeof(values));
+			memset(isNulls, false, sizeof(isNulls));
+
+			values[0] = PointerGetDatum(cstring_to_text(nodeName));
+			values[1] = Int32GetDatum(nodePort);
+			values[2] = PointerGetDatum(cstring_to_text(targetNodeName));
+			values[3] = Int32GetDatum(targetNodePort);
+			values[4] = BoolGetDatum(ParseBoolField(result, 0, 0));
+
+			tuplestore_putvalues(tupleStore, tupleDescriptor, values, isNulls);
+
+			ForgetResults(connection);
+		}
+	}
+}
 
 
 /*
@@ -156,7 +218,8 @@ master_run_on_worker(PG_FUNCTION_ARGS)
 	}
 
 	int commandCount = ParseCommandParameters(fcinfo, &nodeNameArray, &nodePortArray,
-											  &commandStringArray, &parallelExecution);
+											  &commandStringArray,
+											  &parallelExecution);
 
 	MemoryContext per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
 	MemoryContext oldcontext = MemoryContextSwitchTo(per_query_ctx);
@@ -196,11 +259,13 @@ master_run_on_worker(PG_FUNCTION_ARGS)
 	{
 		ExecuteCommandsInParallelAndStoreResults(nodeNameArray, nodePortArray,
 												 commandStringArray,
-												 statusArray, resultArray, commandCount);
+												 statusArray, resultArray,
+												 commandCount);
 	}
 	else
 	{
-		ExecuteCommandsAndStoreResults(nodeNameArray, nodePortArray, commandStringArray,
+		ExecuteCommandsAndStoreResults(nodeNameArray, nodePortArray,
+									   commandStringArray,
 									   statusArray, resultArray, commandCount);
 	}
 
@@ -240,7 +305,8 @@ ParseCommandParameters(FunctionCallInfo fcinfo, StringInfo **nodeNameArray,
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("expected same number of node name, port, and query string")));
+				 errmsg(
+					 "expected same number of node name, port, and query string")));
 	}
 
 	StringInfo *nodeNames = palloc0(nodeNameCount * sizeof(StringInfo));
@@ -280,9 +346,11 @@ ParseCommandParameters(FunctionCallInfo fcinfo, StringInfo **nodeNameArray,
  * commandCount items.
  */
 static void
-ExecuteCommandsInParallelAndStoreResults(StringInfo *nodeNameArray, int *nodePortArray,
+ExecuteCommandsInParallelAndStoreResults(StringInfo *nodeNameArray,
+										 int *nodePortArray,
 										 StringInfo *commandStringArray,
-										 bool *statusArray, StringInfo *resultStringArray,
+										 bool *statusArray,
+										 StringInfo *resultStringArray,
 										 int commandCount)
 {
 	MultiConnection **connectionArray =
@@ -311,7 +379,8 @@ ExecuteCommandsInParallelAndStoreResults(StringInfo *nodeNameArray, int *nodePor
 
 		if (PQstatus(connection->pgConn) != CONNECTION_OK)
 		{
-			appendStringInfo(queryResultString, "failed to connect to %s:%d", nodeName,
+			appendStringInfo(queryResultString, "failed to connect to %s:%d",
+							 nodeName,
 							 (int) nodePort);
 			statusArray[commandIndex] = false;
 			connectionArray[commandIndex] = NULL;

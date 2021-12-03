@@ -319,7 +319,7 @@ SELECT citus_check_connection_to_node('localhost', :worker_2_port);
 
 \c - - - :master_port
 
-SELECT * FROM citus_check_cluster_node_health();
+SELECT * FROM citus_check_cluster_node_health() ORDER BY 1,2,3,4;
 
 RESET client_min_messages;
 DROP SCHEMA tools CASCADE;
