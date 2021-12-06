@@ -1,4 +1,3 @@
-test: turn_mx_off
 test: multi_follower_sanity_check
 test: follower_single_node
 test: multi_follower_select_statements
