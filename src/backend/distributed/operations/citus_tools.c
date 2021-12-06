@@ -157,7 +157,7 @@ StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescripto
 		int32 connectionFlags = 0;
 
 		MultiConnection *connection =
-			StartNodeConnection(connectionFlags, nodeName, nodePort);
+			GetNodeConnection(connectionFlags, nodeName, nodePort);
 
 		WorkerNode *targetWorkerNode = NULL;
 		foreach_ptr(targetWorkerNode, workerNodeList)
