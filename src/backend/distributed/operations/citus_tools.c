@@ -156,6 +156,9 @@ StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescripto
 
 	List *workerNodeList = ActivePrimaryNodeList(ShareLock);
 
+	/* we want to check for connectivity in a deterministic order */
+	workerNodeList = SortList(workerNodeList, CompareWorkerNodes);
+
 	WorkerNode *sourceWorkerNode = NULL;
 	foreach_ptr(sourceWorkerNode, workerNodeList)
 	{
