@@ -139,7 +139,14 @@ GetConnectivityCheckCommand(const char *nodeName, const uint32 nodePort)
 
 /*
  * StoreAllConnectivityChecks performs connectivity checks from all the nodes to all the
- * nodes, and report success status
+ * nodes, and report success status.
+ *
+ * Algorithm is:
+ * for sourceNode in activePrimaryWorkerList:
+ *   c = connectToNode(sourceNode)
+ *   for targetNode in activePrimaryWorkerList:
+ *     status = c.execute("SELECT citus_check_connection_to_node(targetNode.name, targetNode.port")
+ *     emit sourceNode.name, sourceNode.port, targetNode.name, targetNode.port, status
  */
 static void
 StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescriptor)
@@ -149,15 +156,15 @@ StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescripto
 
 	List *workerNodeList = ActivePrimaryNodeList(ShareLock);
 
-	WorkerNode *workerNode = NULL;
-	foreach_ptr(workerNode, workerNodeList)
+	WorkerNode *sourceWorkerNode = NULL;
+	foreach_ptr(sourceWorkerNode, workerNodeList)
 	{
-		const char *nodeName = workerNode->workerName;
-		const int nodePort = workerNode->workerPort;
+		const char *sourceNodeName = sourceWorkerNode->workerName;
+		const int sourceNodePort = sourceWorkerNode->workerPort;
 		int32 connectionFlags = 0;
 
-		MultiConnection *connection =
-			GetNodeConnection(connectionFlags, nodeName, nodePort);
+		MultiConnection *connectionToSourceNode =
+			GetNodeConnection(connectionFlags, sourceNodeName, sourceNodePort);
 
 		WorkerNode *targetWorkerNode = NULL;
 		foreach_ptr(targetWorkerNode, workerNodeList)
@@ -165,18 +172,20 @@ StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescripto
 			const char *targetNodeName = targetWorkerNode->workerName;
 			const int targetNodePort = targetWorkerNode->workerPort;
 
-			char *connectivityCheckCommand =
+			char *connectivityCheckCommandToTargetNode =
 				GetConnectivityCheckCommand(targetNodeName, targetNodePort);
 
 			PGresult *result = NULL;
-			ExecuteOptionalRemoteCommand(connection, connectivityCheckCommand, &result);
+			ExecuteOptionalRemoteCommand(connectionToSourceNode,
+										 connectivityCheckCommandToTargetNode,
+										 &result);
 
 			/* get ready for the next tuple */
 			memset(values, 0, sizeof(values));
 			memset(isNulls, false, sizeof(isNulls));
 
-			values[0] = PointerGetDatum(cstring_to_text(nodeName));
-			values[1] = Int32GetDatum(nodePort);
+			values[0] = PointerGetDatum(cstring_to_text(sourceNodeName));
+			values[1] = Int32GetDatum(sourceNodePort);
 			values[2] = PointerGetDatum(cstring_to_text(targetNodeName));
 			values[3] = Int32GetDatum(targetNodePort);
 			values[4] = BoolGetDatum(ParseBoolField(result, 0, 0));
@@ -184,7 +193,7 @@ StoreAllConnectivityChecks(Tuplestorestate *tupleStore, TupleDesc tupleDescripto
 			tuplestore_putvalues(tupleStore, tupleDescriptor, values, isNulls);
 
 			PQclear(result);
-			ForgetResults(connection);
+			ForgetResults(connectionToSourceNode);
 		}
 	}
 }
